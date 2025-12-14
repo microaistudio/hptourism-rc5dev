@@ -1,0 +1,10 @@
+{
+  "id": "backup_20251213_203000",
+  "createdAt": "2025-12-13T20:30:00.046Z",
+  "type": "full",
+  "sizeBytes": 15643058,
+  "status": "success",
+  "databaseFile": "/home/subhash.thakur.india/Projects/hptourism-rc5dev/backups/backup_20251213_203000_database.sql.gz",
+  "filesArchive": "/home/subhash.thakur.india/Projects/hptourism-rc5dev/backups/backup_20251213_203000_files.zip",
+  "duration": 2429
+}

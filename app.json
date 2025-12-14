@@ -1,0 +1,85 @@
+{
+  "name": "hp-tourism-digital-ecosystem",
+  "description": "Himachal Pradesh Tourism Digital Ecosystem - Smart Compliance Hub for homestay registration implementing the 2025 Homestay Rules",
+  "repository": "https://github.com/YOUR_USERNAME/hp-tourism-ecosystem",
+  "keywords": [
+    "tourism",
+    "government",
+    "digital-governance",
+    "homestay",
+    "himachal-pradesh",
+    "nodejs",
+    "postgresql"
+  ],
+  "env": {
+    "DATABASE_URL": {
+      "description": "PostgreSQL connection string (use Neon or Cloud SQL). Format: postgresql://user:password@host:port/database",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Secret key for session encryption (will be auto-generated if not provided)",
+      "generator": "secret",
+      "required": false
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production",
+      "required": false
+    },
+    "PORT": {
+      "description": "Port for the application (auto-configured by Cloud Run)",
+      "value": "8080",
+      "required": false
+    }
+  },
+  "options": {
+    "allow-unauthenticated": true,
+    "memory": "512Mi",
+    "cpu": "1",
+    "max-instances": 10,
+    "min-instances": 0,
+    "timeout": "300s"
+  },
+  "hooks": {
+    "prebuild": {
+      "commands": [
+        "echo '🚀 Starting HP Tourism Ecosystem build...'",
+        "echo 'Node version:' && node --version",
+        "echo 'NPM version:' && npm --version"
+      ]
+    },
+    "postbuild": {
+      "commands": [
+        "echo '✅ Build completed successfully!'",
+        "echo 'Container image: ${IMAGE_URL}'"
+      ]
+    },
+    "postcreate": {
+      "commands": [
+        "echo '🎉 HP Tourism Ecosystem deployed successfully!'",
+        "echo 'Service URL: ${SERVICE_URL}'",
+        "echo ''",
+        "echo 'Next steps:'",
+        "echo '1. Set up your PostgreSQL database (Neon or Cloud SQL)'",
+        "echo '2. Configure DATABASE_URL environment variable'",
+        "echo '3. Visit ${SERVICE_URL} to access the application'",
+        "echo '4. Use the dev console to seed sample data'",
+        "echo ''",
+        "echo 'Demo credentials (after seeding):'",
+        "echo '  District Officer: 9876543211 / test123'",
+        "echo '  State Officer: 9876543212 / test123'",
+        "echo '  Property Owner: 9876543210 / test123'"
+      ]
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1
+    }
+  },
+  "build": {
+    "docker": {
+      "web": "Dockerfile"
+    }
+  }
+}

@@ -1,0 +1,92 @@
+# Cloud Build configuration for HP Tourism Digital Ecosystem
+# Automated CI/CD pipeline for Google Cloud Run deployment
+
+steps:
+  # Step 1: Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag=gcr.io/$PROJECT_ID/hp-tourism-ecosystem:$COMMIT_SHA'
+      - '--tag=gcr.io/$PROJECT_ID/hp-tourism-ecosystem:latest'
+      - '--cache-from=gcr.io/$PROJECT_ID/hp-tourism-ecosystem:latest'
+      - '--build-arg=BUILDKIT_INLINE_CACHE=1'
+      - '.'
+    id: 'build-image'
+    timeout: 600s
+
+  # Step 2: Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/hp-tourism-ecosystem:$COMMIT_SHA'
+    id: 'push-image-sha'
+    waitFor: ['build-image']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/hp-tourism-ecosystem:latest'
+    id: 'push-image-latest'
+    waitFor: ['build-image']
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdks/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'hp-tourism-ecosystem'
+      - '--image=gcr.io/$PROJECT_ID/hp-tourism-ecosystem:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--max-instances=10'
+      - '--min-instances=0'
+      - '--timeout=300s'
+      - '--set-env-vars=NODE_ENV=production'
+      - '--set-secrets=DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest'
+    id: 'deploy-cloud-run'
+    waitFor: ['push-image-sha']
+
+  # Step 4: Display deployment info
+  - name: 'gcr.io/google.com/cloudsdks/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "======================================"
+        echo "🎉 HP Tourism Ecosystem Deployed!"
+        echo "======================================"
+        echo ""
+        echo "Service: hp-tourism-ecosystem"
+        echo "Region: ${_REGION}"
+        echo "Image: gcr.io/$PROJECT_ID/hp-tourism-ecosystem:$COMMIT_SHA"
+        echo ""
+        echo "Get service URL:"
+        echo "gcloud run services describe hp-tourism-ecosystem --region=${_REGION} --format='value(status.url)'"
+        echo ""
+        echo "View logs:"
+        echo "gcloud run services logs read hp-tourism-ecosystem --region=${_REGION}"
+        echo "======================================"
+    id: 'display-info'
+    waitFor: ['deploy-cloud-run']
+
+# Store images in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/hp-tourism-ecosystem:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/hp-tourism-ecosystem:latest'
+
+# Substitutions for deployment configuration
+substitutions:
+  _REGION: 'us-central1'  # Change to your preferred region
+
+# Build options
+options:
+  machineType: 'N1_HIGHCPU_8'  # Faster builds
+  logging: CLOUD_LOGGING_ONLY
+  logStreamingOption: STREAM_ON
+
+# Build timeout
+timeout: 1200s

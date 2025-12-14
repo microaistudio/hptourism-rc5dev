@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1765322309640,
+      "tag": "0000_add_payment_fields",
+      "breakpoints": true
+    }
+  ]
+}

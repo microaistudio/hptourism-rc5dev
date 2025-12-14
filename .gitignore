@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-new
+client/dist-debug/
+client/dist-new/
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+server/himkosh/echallan.key
+.pm2
+local-object-storage/
+tmp/
+attached_assets/
+docs/smoke-reports/
+logs/
+.env

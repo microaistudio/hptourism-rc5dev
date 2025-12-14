@@ -1,0 +1,47 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="outerRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b7e4ff"/>
+      <stop offset="100%" stop-color="#87c4e5"/>
+    </linearGradient>
+    <linearGradient id="innerCircle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14407c"/>
+      <stop offset="100%" stop-color="#0a1f47"/>
+    </linearGradient>
+    <linearGradient id="mountainFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5aaae0"/>
+      <stop offset="100%" stop-color="#0d3a74"/>
+    </linearGradient>
+    <linearGradient id="boltFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e3f2ff"/>
+    </linearGradient>
+    <path id="textPathTop" d="M100 20 a80 80 0 1 1 -0.1 0"/>
+    <path id="textPathBottom" d="M100 180 a80 80 0 1 0 0.1 0"/>
+  </defs>
+
+  <circle cx="100" cy="100" r="95" fill="url(#outerRing)" stroke="#0c2c5c" stroke-width="3"/>
+  <circle cx="100" cy="100" r="78" fill="url(#innerCircle)" stroke="#a8d9ff" stroke-width="6"/>
+
+  <path
+    d="M45 132 L75 100 L95 118 L118 98 L150 132 Z"
+    fill="url(#mountainFill)"
+  />
+  <path
+    d="M78 100 L110 72 L100 110 L128 110 L90 165 L102 130 L72 130 Z"
+    fill="url(#boltFill)"
+  />
+
+  <circle cx="100" cy="100" r="70" fill="none" stroke="#2b5c97" stroke-width="2"/>
+
+  <text fill="#0d2f66" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="12" letter-spacing="2">
+    <textPath href="#textPathTop" startOffset="50%" text-anchor="middle">
+      HIMACHAL PRADESH STATE ELECTRONICS DEV. CORP. LTD.
+    </textPath>
+  </text>
+  <text fill="#0d2f66" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="12" letter-spacing="2">
+    <textPath href="#textPathBottom" startOffset="50%" text-anchor="middle">
+      HIMACHAL PRADESH STATE ELECTRONICS DEV. CORP. LTD.
+    </textPath>
+  </text>
+</svg>
