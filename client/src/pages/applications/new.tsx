@@ -57,7 +57,7 @@ import type { User, HomestayApplication, UserProfile, ApplicationServiceContext,
 import { ObjectUploader, type UploadedFileMetadata } from "@/components/ObjectUploader";
 import { ApplicationSummaryCard } from "@/components/application/application-summary";
 import { ApplicationKindBadge, getApplicationKindLabel, isServiceApplication } from "@/components/application/application-kind-badge";
-import { calculateHomestayFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED, type CategoryType, type LocationType } from "@shared/fee-calculator";
+import { calculateHomestayFee, calculateUpgradeFee, formatFee, suggestCategory, validateCategorySelection, CATEGORY_REQUIREMENTS, MAX_ROOMS_ALLOWED, MAX_BEDS_ALLOWED, type CategoryType, type LocationType, type FeeBreakdown } from "@shared/fee-calculator";
 import type { RoomCalcModeSetting } from "@shared/appSettings";
 import { DEFAULT_ROOM_CALC_MODE } from "@shared/appSettings";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -90,6 +90,7 @@ import { Step4DistancesAreas } from "@/components/applications/form-sections/Ste
 import { Step5Documents } from "@/components/applications/form-sections/Step5Documents";
 import { Step6AmenitiesFees } from "@/components/applications/form-sections/Step6AmenitiesFees";
 import { Step6CancellationReview } from "@/components/applications/form-sections/Step6CancellationReview";
+import { Step6SimpleReview } from "@/components/applications/form-sections/Step6SimpleReview";
 import { applicationSchema, type ApplicationForm } from "@/lib/application-schema";
 
 const HP_STATE = DEFAULT_STATE;
@@ -840,6 +841,7 @@ export default function NewApplication() {
   });
 
   const [cancellationConfirmed, setCancellationConfirmed] = useState(false);
+  const [deleteRoomsConfirmed, setDeleteRoomsConfirmed] = useState(false);
 
   useEffect(() => {
     if (isCorrectionMode) {
@@ -964,6 +966,14 @@ export default function NewApplication() {
   const serviceNote = activeDraftApplication?.serviceNotes;
   const shouldLockPropertyDetails = isServiceDraft;
 
+  // Fetch parent application details if needed (e.g. for Change Category upgrades)
+  const { data: parentApplication } = useQuery<{ application: HomestayApplication }, Error, HomestayApplication>({
+    queryKey: [`/api/applications/${parentApplicationId}`],
+    enabled: !!parentApplicationId && activeApplicationKind === 'change_category',
+    staleTime: 5 * 60 * 1000,
+    select: (data) => data.application, // Extract from { application: ... } wrapper
+  });
+
   // Auto-navigate to Documents (Step 5) for corrections OR if no documents uploaded
   const hasAutoNavigatedToDocuments = useRef(false);
   useEffect(() => {
@@ -975,22 +985,8 @@ export default function NewApplication() {
       return;
     }
 
-    // Service Request (Add Rooms): Auto-navigate to Step 3 (Rooms & Category)
-    // The user skips property/owner details as they are inherited.
-    if (activeDraftApplication && !isCorrectionMode && activeApplicationKind === 'add_rooms' && !hasAutoNavigatedToDocuments.current) {
-      hasAutoNavigatedToDocuments.current = true;
-      setStep(3);
-      setMaxStepReached(3);
-      return;
-    }
-
-    // Cancellation: Auto-navigate to Step 6 (Review)
-    if (activeDraftApplication && !isCorrectionMode && activeApplicationKind === 'cancel_certificate' && !hasAutoNavigatedToDocuments.current) {
-      hasAutoNavigatedToDocuments.current = true;
-      setStep(6);
-      setMaxStepReached(6);
-      return;
-    }
+    // Service Request auto-navigation is now handled in the restoration effect (line 1828+)
+    // to prevent race conditions with initial hydration.
 
     // Draft/submitted without documents: go to documents step so owner can upload
     // (Note: We skip this for add_rooms and cancellation above to ensure they land on the correct step)
@@ -1281,7 +1277,9 @@ export default function NewApplication() {
   // Determine submit button label based on correction mode and payment workflow
   const submitButtonLabel = isCorrectionMode
     ? "Resubmit Application"
-    : (isUpfrontPayment ? "💳 Pay & Submit" : "Submit Application");
+    : (activeApplicationKind === 'delete_rooms' || activeApplicationKind === 'cancel_certificate')
+      ? "Submit Request"
+      : (isUpfrontPayment ? "💳 Pay & Submit" : "Submit Application");
   const stepTopRef = useRef<HTMLDivElement | null>(null);
   const trimmedTehsilOther = tehsilOther?.trim() || "";
   const displayTehsil = tehsil === "__other" ? (trimmedTehsilOther || "—") : (tehsil || "—");
@@ -1822,15 +1820,34 @@ export default function NewApplication() {
     setDraftId(draft.id);
     hydrateFormFromSource(draft);
 
+    const draftKind = draft.applicationKind as ApplicationKind | undefined;
+
     if (draft.currentPage && draft.currentPage >= 1 && draft.currentPage <= totalSteps) {
-      setStep(draft.currentPage);
-      setMaxStepReached(draft.currentPage);
+      // For service requests, ensure we don't start before the relevant step
+      let targetStep = draft.currentPage;
+
+      if ((draftKind === 'add_rooms' || draftKind === 'delete_rooms') && targetStep < 3) {
+        targetStep = 3;
+      } else if (draftKind === 'cancel_certificate' && targetStep < 6) {
+        targetStep = 6;
+      }
+
+      setStep(targetStep);
+      setMaxStepReached(targetStep);
     } else {
-      setStep(1);
-      setMaxStepReached(1);
+      // Default starting steps for new/invalid drafts
+      if (draftKind === 'add_rooms' || draftKind === 'delete_rooms') {
+        setStep(3);
+        setMaxStepReached(3);
+      } else if (draftKind === 'cancel_certificate') {
+        setStep(6);
+        setMaxStepReached(6);
+      } else {
+        setStep(1);
+        setMaxStepReached(1);
+      }
     }
 
-    const draftKind = draft.applicationKind as ApplicationKind | undefined;
     const isService = isServiceApplication(draftKind);
     toast({
       title: isService
@@ -2010,6 +2027,77 @@ export default function NewApplication() {
   const calculateFee = () => {
     // Detect Pangi sub-division (Chamba district, Pangi tehsil)
     const isPangiSubDivision = district === "Chamba" && tehsilForRules === "Pangi";
+
+    console.log("calculateFee - activeApplicationKind:", activeApplicationKind);
+
+    // No fee for delete_rooms or cancel_certificate
+    if (activeApplicationKind === 'delete_rooms' || activeApplicationKind === 'cancel_certificate') {
+      console.log("Returning zero fee due to application kind:", activeApplicationKind);
+      return {
+        baseFee: 0,
+        totalBeforeDiscounts: 0,
+        validityDiscount: 0,
+        femaleOwnerDiscount: 0,
+        pangiDiscount: 0,
+        totalDiscount: 0,
+        totalFee: 0,
+        savingsAmount: 0,
+        savingsPercentage: 0,
+        gstAmount: 0,
+        perRoomFee: 0,
+      };
+    }
+
+
+
+    // Change Category: Calculate upgrade fee (difference)
+    if (activeApplicationKind === 'change_category' && parentApplication?.category) {
+      const feeBreakdown = calculateUpgradeFee(
+        parentApplication.category,
+        category as CategoryType,
+        resolvedLocationType,
+        parseInt(certificateValidityYears) as 1 | 3,
+        (ownerGender || "male") as "male" | "female" | "other",
+        isPangiSubDivision
+      );
+
+      // Also calculate old and new category fees for breakdown display
+      const oldCategoryFee = calculateHomestayFee({
+        category: parentApplication.category,
+        locationType: resolvedLocationType,
+        validityYears: parseInt(certificateValidityYears) as 1 | 3,
+        ownerGender: (ownerGender || "male") as "male" | "female" | "other",
+        isPangiSubDivision,
+      });
+      const newCategoryFee = calculateHomestayFee({
+        category: category as CategoryType,
+        locationType: resolvedLocationType,
+        validityYears: parseInt(certificateValidityYears) as 1 | 3,
+        ownerGender: (ownerGender || "male") as "male" | "female" | "other",
+        isPangiSubDivision,
+      });
+
+      console.log("Calculated upgrade fee:", feeBreakdown, "old:", oldCategoryFee.finalFee, "new:", newCategoryFee.finalFee);
+      return {
+        baseFee: feeBreakdown.baseFee,
+        totalBeforeDiscounts: feeBreakdown.totalBeforeDiscounts,
+        validityDiscount: feeBreakdown.validityDiscount,
+        femaleOwnerDiscount: feeBreakdown.femaleOwnerDiscount,
+        pangiDiscount: feeBreakdown.pangiDiscount,
+        totalDiscount: feeBreakdown.totalDiscount,
+        totalFee: feeBreakdown.finalFee,
+        savingsAmount: feeBreakdown.savingsAmount,
+        savingsPercentage: feeBreakdown.savingsPercentage,
+        gstAmount: 0,
+        perRoomFee: 0,
+        // Upgrade-specific info for UI breakdown
+        _isUpgrade: true,
+        _previousCategory: parentApplication.category,
+        _previousCategoryFee: oldCategoryFee.finalFee,
+        _newCategoryFee: newCategoryFee.finalFee,
+        _upgradeFee: feeBreakdown.finalFee,
+      };
+    }
 
     // Use new 2025 fee calculator
     const feeBreakdown = calculateHomestayFee({
@@ -2457,7 +2545,7 @@ export default function NewApplication() {
     }
 
     // Handle upfront payment flow - redirect to payment page instead of direct submission
-    if (isUpfrontPayment && !isCorrectionMode) {
+    if (isUpfrontPayment && !isCorrectionMode && activeApplicationKind !== 'delete_rooms' && activeApplicationKind !== 'cancel_certificate') {
       console.log("Upfront payment mode - redirecting to payment...");
 
       // For upfront payment, we need to save as draft first and then go to payment
@@ -2929,6 +3017,8 @@ export default function NewApplication() {
                 resolvedCategory={resolvedCategory}
                 resolvedCategoryBand={resolvedCategoryBand}
                 shouldLockCategoryWarning={shouldLockCategoryWarning}
+                activeApplicationKind={activeApplicationKind}
+                currentCategory={parentApplication?.category}
               />
             )}
 
@@ -2950,9 +3040,12 @@ export default function NewApplication() {
                   requiresCommercialUtilityProof={requiresCommercialUtilityProof}
                   isCorrection={isCorrectionMode}
                   correctionNotes={activeCorrectionApplication?.correctionNotes || undefined}
+                  applicationKind={activeApplicationKind ?? undefined}
                 />
               )
             }
+
+
 
             {
               step === 6 && activeApplicationKind === 'cancel_certificate' ? (
@@ -2961,6 +3054,17 @@ export default function NewApplication() {
                   cancellationConfirmed={cancellationConfirmed}
                   setCancellationConfirmed={setCancellationConfirmed}
                   activeDraftApplication={activeDraftApplication}
+                />
+              ) : step === 6 && activeApplicationKind === 'delete_rooms' ? (
+                <Step6SimpleReview
+                  form={form}
+                  submitConfirmed={deleteRoomsConfirmed}
+                  setSubmitConfirmed={setDeleteRoomsConfirmed}
+                  activeDraftApplication={activeDraftApplication}
+                  title="Confirm Room Deletion"
+                  description="You are about to submit a request to remove rooms from your registered inventory. No payment is required for this action."
+                  confirmationText="I confirm that I want to remove the specified rooms from my registration."
+                  currentRooms={applicationsData?.applications.find(app => app.id === parentApplicationId)?.totalRooms}
                 />
               ) : step === 6 ? (
                 <Step6AmenitiesFees
@@ -2979,6 +3083,13 @@ export default function NewApplication() {
                   activeDraftApplication={activeDraftApplication}
                   correctionId={correctionId}
                   selectedAmenitiesCount={selectedAmenitiesCount}
+                  isUpgrade={activeApplicationKind === 'change_category' && !!(fees as any)._isUpgrade}
+                  upgradeFeeInfo={(fees as any)._isUpgrade ? {
+                    previousCategory: (fees as any)._previousCategory,
+                    previousCategoryFee: (fees as any)._previousCategoryFee,
+                    newCategoryFee: (fees as any)._newCategoryFee,
+                    upgradeFee: (fees as any)._upgradeFee,
+                  } : undefined}
                 />
               ) : null
             }
@@ -3026,7 +3137,7 @@ export default function NewApplication() {
                   type="button"
                   variant="destructive"
                   disabled={!cancellationConfirmed || submitApplicationMutation.isPending}
-                  onClick={() => submitApplicationMutation.mutate()}
+                  onClick={() => submitApplicationMutation.mutate(form.getValues())}
                   data-testid="button-submit-cancellation"
                 >
                   {submitApplicationMutation.isPending ? "Submitting..." : "Submit Cancellation Request"}
@@ -3070,10 +3181,11 @@ export default function NewApplication() {
                   Next
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
-              ) : (
+              ) : activeApplicationKind !== 'cancel_certificate' && (
                 <Button
                   type="submit"
-                  disabled={submitApplicationMutation.isPending || (isCorrectionMode && !correctionAcknowledged)}
+
+                  disabled={submitApplicationMutation.isPending || (isCorrectionMode && !correctionAcknowledged) || (activeApplicationKind === 'delete_rooms' && !deleteRoomsConfirmed)}
                   data-testid="button-submit-application"
                   onClick={async () => {
                     console.log("Submit button clicked");
@@ -3416,7 +3528,7 @@ export default function NewApplication() {
             </div>
           </DialogContent>
         </Dialog>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }

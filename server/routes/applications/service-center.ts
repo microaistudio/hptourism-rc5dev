@@ -31,7 +31,7 @@ const roomDeltaSchema = z
 
 const serviceRequestSchema = z.object({
   baseApplicationId: z.string().uuid(),
-  serviceType: z.enum(["renewal", "add_rooms", "delete_rooms", "cancel_certificate"]),
+  serviceType: z.enum(["renewal", "add_rooms", "delete_rooms", "cancel_certificate", "change_category"]),
   note: z.string().max(1000).optional(),
   roomDelta: roomDeltaSchema.optional(),
 });
@@ -189,13 +189,13 @@ async function buildServiceSummary(application: HomestayApplication) {
     },
     activeServiceRequest: activeRequest
       ? {
-          id: activeRequest.id,
-          applicationNumber: activeRequest.applicationNumber,
-          applicationKind: activeRequest.applicationKind,
-          status: activeRequest.status,
-          totalRooms: activeRequest.totalRooms,
-          createdAt: activeRequest.createdAt,
-        }
+        id: activeRequest.id,
+        applicationNumber: activeRequest.applicationNumber,
+        applicationKind: activeRequest.applicationKind,
+        status: activeRequest.status,
+        totalRooms: activeRequest.totalRooms,
+        createdAt: activeRequest.createdAt,
+      }
       : null,
   };
 }
@@ -298,9 +298,9 @@ export function createServiceCenterRouter() {
         requestedDeletions: (targetRooms as any).requestedDeletions,
         renewalWindow: renewalWindow
           ? {
-              start: renewalWindow.windowStart.toISOString(),
-              end: renewalWindow.windowEnd.toISOString(),
-            }
+            start: renewalWindow.windowStart.toISOString(),
+            end: renewalWindow.windowEnd.toISOString(),
+          }
           : undefined,
         requiresPayment: !["delete_rooms", "cancel_certificate"].includes(serviceType),
         inheritsCertificateExpiry: expiryDate ? expiryDate.toISOString() : undefined,

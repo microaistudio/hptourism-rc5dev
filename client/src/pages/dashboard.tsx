@@ -353,6 +353,95 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Application Progress Timeline - Shows current stage */}
+        {applications.length > 0 && (() => {
+          const primaryApp = applications.find(a => a.status !== 'approved' && a.status !== 'rejected') || applications[0];
+          if (!primaryApp) return null;
+          const progress = getOwnerProgressState(primaryApp);
+          return (
+            <Card className="mb-8">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Application Status</CardTitle>
+                    <CardDescription>{primaryApp.propertyName || 'Your Application'} • {primaryApp.applicationNumber || 'DRAFT'}</CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (primaryApp.status === 'draft') {
+                        setLocation(`/applications/new?draft=${primaryApp.id}`);
+                      } else {
+                        setLocation(`/applications/${primaryApp.id}`);
+                      }
+                    }}
+                  >
+                    View Details
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Progress Timeline */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-1">
+                    {ownerProgressMilestones.map((milestone, idx) => {
+                      const isCompleted = idx <= progress.stageIndex;
+                      const isConnectorComplete = idx < progress.stageIndex;
+                      const isLast = idx === ownerProgressMilestones.length - 1;
+                      const isCurrent = idx === progress.stageIndex;
+
+                      return (
+                        <div key={milestone.id} className="flex items-center flex-1">
+                          <div
+                            className={cn(
+                              "flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold transition-all shrink-0",
+                              isCompleted
+                                ? "border-emerald-500 bg-emerald-500 text-white shadow-[0_0_0_4px_rgba(34,197,94,0.15)]"
+                                : "border-muted-foreground/30 bg-background text-muted-foreground"
+                            )}
+                          >
+                            {isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                          </div>
+                          {!isLast && (
+                            <div
+                              className={cn(
+                                "h-[3px] flex-1 rounded-full transition-all mx-1",
+                                isConnectorComplete
+                                  ? "bg-gradient-to-r from-emerald-300 to-emerald-500"
+                                  : "bg-muted-foreground/20"
+                              )}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div
+                    className="mt-3 grid gap-2 text-center text-[10px] font-semibold uppercase tracking-wide"
+                    style={{
+                      gridTemplateColumns: `repeat(${ownerProgressMilestones.length}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {ownerProgressMilestones.map((milestone, idx) => (
+                      <span
+                        key={`${milestone.id}-label`}
+                        className={cn(
+                          "leading-tight",
+                          idx <= progress.stageIndex ? "text-emerald-600" : "text-muted-foreground"
+                        )}
+                      >
+                        {milestone.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">{progress.summary}</p>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         {/* Applications List */}
         <Card>
           <CardHeader>
@@ -490,7 +579,7 @@ export default function Dashboard() {
 
         {/* Document Readiness Check Dialog (Homestay only for now) */}
         <Dialog open={showReadinessDialog} onOpenChange={setShowReadinessDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-xl">
                 <ClipboardCheck className="w-6 h-6 text-emerald-600" />
@@ -511,6 +600,9 @@ export default function Dashboard() {
                     <p className="text-sm text-amber-800 dark:text-amber-300 mt-1">
                       Upload <span className="font-bold">minimum 2</span> and up to <span className="font-bold">10 best photographs</span> of your property.
                     </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                      Include: External views, rooms, common areas, bathrooms, surroundings
+                    </p>
                   </div>
                 </div>
               </div>
@@ -529,6 +621,64 @@ export default function Dashboard() {
                       <p className="font-medium text-sm">Revenue Papers / Property Documents</p>
                       <p className="text-xs text-muted-foreground">Proof of ownership</p>
                     </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                    <div>
+                      <p className="font-medium text-sm">Affidavit (Section 29)</p>
+                      <p className="text-xs text-muted-foreground">Self-declaration affidavit as per rules</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50 dark:bg-slate-900">
+                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                    <div>
+                      <p className="font-medium text-sm">Undertaking (Form-C)</p>
+                      <p className="text-xs text-muted-foreground">Declaration of compliance with regulations</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category-specific */}
+              <div className="space-y-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Building2 className="w-5 h-5 text-slate-600" />
+                  Additional for Gold & Diamond Category
+                </h3>
+
+                <div className="grid gap-3">
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200">
+                    <CreditCard className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <p className="font-medium text-sm">Commercial Electricity Bill</p>
+                      <p className="text-xs text-muted-foreground">Recent utility bill under commercial connection</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200">
+                    <CreditCard className="w-5 h-5 text-yellow-600" />
+                    <div>
+                      <p className="font-medium text-sm">Commercial Water Bill</p>
+                      <p className="text-xs text-muted-foreground">Recent water utility bill</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Other Information */}
+              <div className="p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200">
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-6 h-6 text-blue-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-200">Property Details Needed</h3>
+                    <ul className="text-sm text-blue-800 dark:text-blue-300 mt-2 space-y-1">
+                      <li>• Exact property address with PIN code</li>
+                      <li>• Number of rooms and their rates</li>
+                      <li>• Owner Aadhaar number (for verification)</li>
+                      <li>• GPS location coordinates (if available)</li>
+                    </ul>
                   </div>
                 </div>
               </div>

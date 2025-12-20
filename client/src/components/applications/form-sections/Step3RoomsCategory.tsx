@@ -79,6 +79,9 @@ interface Step3RoomsCategoryProps {
     resolvedCategory: CategoryType;
     resolvedCategoryBand: { min: number; max: number | null };
     shouldLockCategoryWarning: boolean;
+    // New props for change_category
+    activeApplicationKind?: string;
+    currentCategory?: CategoryType;
 }
 
 export function Step3RoomsCategory({
@@ -107,7 +110,20 @@ export function Step3RoomsCategory({
     resolvedCategory,
     resolvedCategoryBand,
     shouldLockCategoryWarning,
+    activeApplicationKind,
+    currentCategory,
 }: Step3RoomsCategoryProps) {
+    const isUpgradeMode = activeApplicationKind === 'change_category';
+
+    // Filter categories if looking for upgrade
+    // Only show categories strictly higher than current
+    const allowedCategories = isUpgradeMode && currentCategory
+        ? CATEGORY_CARD_INFO.filter(info =>
+            CATEGORY_ORDER[info.value] > CATEGORY_ORDER[currentCategory]
+        )
+        : CATEGORY_CARD_INFO;
+
+
     return (
         <>
             <Card>
@@ -154,77 +170,101 @@ export function Step3RoomsCategory({
                         </div>
                     </div>
 
+                    {isUpgradeMode && currentCategory && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                            <div className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-1">
+                                Current Category
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Badge variant={getCategoryBadge(currentCategory).variant} className="text-sm">
+                                    {getCategoryBadge(currentCategory).label}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                    Select a higher category to upgrade your property.
+                                </span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Category Selection Cards */}
                     <div className="space-y-3">
                         <label className="text-sm font-medium">Select Category</label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {CATEGORY_CARD_INFO.map((info) => {
-                                const isSelected = category === info.value;
-                                const isApplicable = suggestedCategory === info.value;
-                                const isDisabled = lockToRecommendedCategory && !isApplicable;
-                                const band = categoryRateBands[info.value];
+                        {allowedCategories.length === 0 ? (
+                            <div className="text-center p-8 border-2 border-dashed rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                                <p className="text-muted-foreground">You are already at the highest category ({getCategoryBadge(currentCategory || 'diamond').label}).</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {allowedCategories.map((info) => {
+                                    const isSelected = category === info.value;
+                                    const isApplicable = suggestedCategory === info.value;
+                                    // Lock logic: disable if strict recommendation is ON, unless it's the target
+                                    // For upgrade, we might want to be freer, but respecting the rules is safer.
+                                    const isDisabled = lockToRecommendedCategory && !isApplicable;
+                                    const band = categoryRateBands[info.value];
 
-                                // Metallic color schemes for each category
-                                const categoryStyles = {
-                                    silver: {
-                                        background: isSelected
-                                            ? "bg-gradient-to-br from-slate-100 via-gray-200 to-slate-300 border-slate-400"
-                                            : "bg-gradient-to-br from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200",
-                                        text: "text-slate-700",
-                                        badge: "bg-slate-500 text-white"
-                                    },
-                                    gold: {
-                                        background: isSelected
-                                            ? "bg-gradient-to-br from-amber-100 via-yellow-200 to-amber-300 border-amber-500"
-                                            : "bg-gradient-to-br from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200",
-                                        text: "text-amber-800",
-                                        badge: "bg-amber-500 text-white"
-                                    },
-                                    diamond: {
-                                        background: isSelected
-                                            ? "bg-gradient-to-br from-cyan-100 via-purple-100 to-pink-100 border-purple-400"
-                                            : "bg-gradient-to-br from-cyan-50 to-purple-50 hover:from-cyan-100 hover:to-purple-100",
-                                        text: "text-purple-800",
-                                        badge: "bg-gradient-to-r from-cyan-500 to-purple-500 text-white"
-                                    }
-                                };
+                                    // Metallic color schemes for each category
+                                    const categoryStyles = {
+                                        silver: {
+                                            background: isSelected
+                                                ? "bg-gradient-to-br from-slate-100 via-gray-200 to-slate-300 border-slate-400"
+                                                : "bg-gradient-to-br from-slate-50 to-gray-100 hover:from-slate-100 hover:to-gray-200",
+                                            text: "text-slate-700",
+                                            badge: "bg-slate-500 text-white"
+                                        },
+                                        gold: {
+                                            background: isSelected
+                                                ? "bg-gradient-to-br from-amber-100 via-yellow-200 to-amber-300 border-amber-500"
+                                                : "bg-gradient-to-br from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200",
+                                            text: "text-amber-800",
+                                            badge: "bg-amber-500 text-white"
+                                        },
+                                        diamond: {
+                                            background: isSelected
+                                                ? "bg-gradient-to-br from-cyan-100 via-purple-100 to-pink-100 border-purple-400"
+                                                : "bg-gradient-to-br from-cyan-50 to-purple-50 hover:from-cyan-100 hover:to-purple-100",
+                                            text: "text-purple-800",
+                                            badge: "bg-gradient-to-r from-cyan-500 to-purple-500 text-white"
+                                        }
+                                    };
 
-                                const styles = categoryStyles[info.value as keyof typeof categoryStyles] || categoryStyles.silver;
+                                    const styles = categoryStyles[info.value as keyof typeof categoryStyles] || categoryStyles.silver;
 
-                                return (
-                                    <div
-                                        key={info.value}
-                                        onClick={() => {
-                                            if (!isDisabled) {
-                                                form.setValue("category", info.value);
-                                            }
-                                        }}
-                                        className={`
-                      relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all hover-elevate
-                      ${styles.background}
-                      ${isSelected ? "shadow-lg ring-2 ring-primary/50" : "hover:shadow-md"}
-                      ${isDisabled ? "opacity-50 cursor-not-allowed grayscale" : ""}
-                    `}
-                                    >
-                                        {isApplicable && (
-                                            <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${styles.badge} text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm`}>
-                                                Applicable
+                                    return (
+                                        <div
+                                            key={info.value}
+                                            onClick={() => {
+                                                if (!isDisabled) {
+                                                    form.setValue("category", info.value);
+                                                }
+                                            }}
+                                            className={`
+                          relative flex flex-col p-4 rounded-xl border-2 cursor-pointer transition-all hover-elevate
+                          ${styles.background}
+                          ${isSelected ? "shadow-lg ring-2 ring-primary/50" : "hover:shadow-md"}
+                          ${isDisabled ? "opacity-50 cursor-not-allowed grayscale" : ""}
+                        `}
+                                        >
+                                            {isApplicable && (
+                                                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${styles.badge} text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shadow-sm`}>
+                                                    Applicable
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h3 className={`font-semibold ${styles.text}`}>{info.title}</h3>
+                                                {isSelected && <Check className="w-4 h-4 text-primary" />}
                                             </div>
-                                        )}
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h3 className={`font-semibold ${styles.text}`}>{info.title}</h3>
-                                            {isSelected && <Check className="w-4 h-4 text-primary" />}
+                                            <p className="text-xs text-muted-foreground mb-3 flex-1">
+                                                {info.description}
+                                            </p>
+                                            <div className="mt-auto pt-3 border-t border-current/10 text-xs font-medium text-muted-foreground">
+                                                Tariff Range: <span className={`${styles.text} font-semibold`}>{formatBandLabel(band)}</span>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-muted-foreground mb-3 flex-1">
-                                            {info.description}
-                                        </p>
-                                        <div className="mt-auto pt-3 border-t border-current/10 text-xs font-medium text-muted-foreground">
-                                            Tariff Range: <span className={`${styles.text} font-semibold`}>{formatBandLabel(band)}</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* Room Calculation Mode Display */}
@@ -413,12 +453,19 @@ export function Step3RoomsCategory({
                                                                 <Input
                                                                     type="number"
                                                                     min={0}
+                                                                    max={999999}
                                                                     placeholder="Enter tariff"
                                                                     className={`h-9 pl-7 w-full ${isRateMissing ? "ring-2 ring-amber-500 border-amber-500 focus:ring-amber-500" : ""}`}
                                                                     value={row.customRate === "" ? "" : row.customRate}
                                                                     onChange={(e) => {
-                                                                        const val = e.target.value === "" ? "" : parseFloat(e.target.value);
-                                                                        updateType2Row(row.id, { customRate: val });
+                                                                        const rawVal = e.target.value;
+                                                                        if (rawVal === "") {
+                                                                            updateType2Row(row.id, { customRate: "" });
+                                                                            return;
+                                                                        }
+                                                                        const parsed = parseFloat(rawVal);
+                                                                        const capped = Math.min(999999, Math.max(0, parsed));
+                                                                        updateType2Row(row.id, { customRate: capped });
                                                                     }}
                                                                 />
                                                             </div>

@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   CreditCard,
   ArrowLeft,
   ShieldCheck,
@@ -642,7 +643,55 @@ export default function HimKoshPaymentPage() {
               </Alert>
 
               <Button
-                onClick={() => initiateMutation.mutate()}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (paymentData && paymentData.isConfigured) {
+                    // POPUP WINDOW STRATEGY (Requested by User):
+                    // 1. Open a "sized" popup window first. Chrome treats these as "Apps" and is less aggressive.
+                    const width = 1024;
+                    const height = 800;
+                    const left = (window.screen.width - width) / 2;
+                    const top = (window.screen.height - height) / 2;
+
+                    const popup = window.open(
+                      "",
+                      "HimKoshPayment",
+                      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
+                    );
+
+                    if (popup) {
+                      // 2. Create and submit form into this named window
+                      const form = document.createElement("form");
+                      form.method = "POST";
+                      form.action = paymentData.paymentUrl;
+                      form.target = "HimKoshPayment"; // Matches window name
+                      form.style.display = "none";
+
+                      const input1 = document.createElement("input");
+                      input1.type = "hidden";
+                      input1.name = "encdata";
+                      input1.value = paymentData.encdata;
+                      form.appendChild(input1);
+
+                      const input2 = document.createElement("input");
+                      input2.type = "hidden";
+                      input2.name = "merchant_code";
+                      input2.value = paymentData.merchantCode;
+                      form.appendChild(input2);
+
+                      document.body.appendChild(form);
+                      form.submit();
+
+                      // Cleanup
+                      setTimeout(() => document.body.removeChild(form), 500);
+                    } else {
+                      alert("Popup blocked! Please allow popups for this site.");
+                    }
+                  } else {
+                    initiateMutation.mutate();
+                  }
+                }}
                 disabled={paymentButtonDisabled}
                 className="w-full"
                 size="lg"
@@ -653,15 +702,17 @@ export default function HimKoshPaymentPage() {
                     {paymentButtonLabel}
                   </span>
                 ) : (
-                  paymentButtonLabel
+                  <span className="flex items-center gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Pay Now
+                  </span>
                 )}
               </Button>
-
               {showTestMode && (
-                <Card className="border-orange-200 bg-orange-50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-orange-700 text-base">
-                      <CheckCircle2 className="h-4 w-4" />
+                <Card className="border-orange-200 bg-orange-50 mb-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-800">
+                      <AlertTriangle className="h-5 w-5" />
                       Test Payment Mode Active
                     </CardTitle>
                     <CardDescription className="text-orange-700">

@@ -70,6 +70,15 @@ export function createPaymentsRouter() {
                 certificateExpiryDate: expiryDate,
                 approvedAt: issueDate,
             });
+
+            // Application Lifecycle: If this was a service request (Add Rooms, etc.),
+            // mark the parent application as superseded to prevent duplicates.
+            if (application.parentApplicationId) {
+                await storage.updateApplication(application.parentApplicationId, {
+                    status: 'superseded',
+                    districtNotes: `Superseded by application ${application.applicationNumber}`
+                });
+            }
             await logApplicationAction({
                 applicationId: payment.applicationId,
                 actorId: userId,

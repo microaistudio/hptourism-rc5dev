@@ -324,7 +324,14 @@ const canViewInspectionReport = (user: User | null, application: HomestayApplica
 };
 
 
+import { createPublicSettingsRouter } from "./routes/public-settings";
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // ... existing code ...
+
+  // Public/Shared Settings Routes
+  app.use("/api/settings", createPublicSettingsRouter());
+
   // Session store: align with rc3 (single worker, Postgres-backed)
   const PgSession = connectPgSimple(session);
   const sessionStore = new PgSession({

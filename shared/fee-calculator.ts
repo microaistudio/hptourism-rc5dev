@@ -29,16 +29,16 @@ export interface FeeBreakdown {
   // Base fee structure
   baseFee: number; // Annual fee from matrix
   totalBeforeDiscounts: number; // baseFee × validityYears
-  
+
   // Discount breakdown
   validityDiscount: number; // 10% for 3-year lump sum
   femaleOwnerDiscount: number; // 5% for female owners
   pangiDiscount: number; // 50% for Pangi sub-division
   totalDiscount: number; // Sum of all discounts
-  
+
   // Final amount
   finalFee: number; // Total payable
-  
+
   // Metadata
   savingsAmount: number; // Total savings from discounts
   savingsPercentage: number; // % saved
@@ -72,16 +72,16 @@ const FEE_MATRIX: Record<CategoryType, Record<LocationType, number>> = {
 export function calculateHomestayFee(input: FeeCalculationInput): FeeBreakdown {
   // Step 1: Get base fee from matrix
   const baseFee = FEE_MATRIX[input.category][input.locationType];
-  
+
   // Step 2: Calculate total for validity period
   let totalBeforeDiscounts = baseFee * input.validityYears;
-  
+
   // Step 3: Apply 3-year discount (10% if applicable)
   let validityDiscount = 0;
   if (input.validityYears === 3) {
     validityDiscount = totalBeforeDiscounts * 0.10;
   }
-  
+
   // Step 4: Apply female owner discount (5% if applicable)
   // Applied AFTER validity discount
   let femaleOwnerDiscount = 0;
@@ -89,7 +89,7 @@ export function calculateHomestayFee(input: FeeCalculationInput): FeeBreakdown {
     const afterValidityDiscount = totalBeforeDiscounts - validityDiscount;
     femaleOwnerDiscount = afterValidityDiscount * 0.05;
   }
-  
+
   // Step 5: Apply Pangi discount (50% if applicable)
   // Applied AFTER validity and female discounts
   let pangiDiscount = 0;
@@ -97,16 +97,16 @@ export function calculateHomestayFee(input: FeeCalculationInput): FeeBreakdown {
     const afterPreviousDiscounts = totalBeforeDiscounts - validityDiscount - femaleOwnerDiscount;
     pangiDiscount = afterPreviousDiscounts * 0.50;
   }
-  
+
   // Calculate totals
   const totalDiscount = validityDiscount + femaleOwnerDiscount + pangiDiscount;
   const finalFee = totalBeforeDiscounts - totalDiscount;
-  
+
   const savingsAmount = totalDiscount;
-  const savingsPercentage = totalBeforeDiscounts > 0 
-    ? (totalDiscount / totalBeforeDiscounts) * 100 
+  const savingsPercentage = totalBeforeDiscounts > 0
+    ? (totalDiscount / totalBeforeDiscounts) * 100
     : 0;
-  
+
   return {
     baseFee,
     totalBeforeDiscounts,
@@ -213,7 +213,7 @@ export function validateCategorySelection(
       );
     }
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -280,10 +280,10 @@ export function calculateRoomRateStats(rooms: Array<{ rate: number }>): RoomRate
   if (rooms.length === 0) {
     return { averageRate: 0, highestRate: 0, lowestRate: 0, totalRevenue: 0 };
   }
-  
+
   const rates = rooms.map(r => r.rate);
   const total = rates.reduce((sum, rate) => sum + rate, 0);
-  
+
   return {
     averageRate: Math.round(total / rates.length),
     highestRate: Math.max(...rates),
@@ -314,10 +314,10 @@ export interface AverageRateResult {
 }
 
 export function calculateAverageRoomRate(roomDetails: RoomTypeDetails): AverageRateResult {
-  const totalRooms = (roomDetails.singleBedRooms || 0) + 
-                     (roomDetails.doubleBedRooms || 0) + 
-                     (roomDetails.familySuites || 0);
-  
+  const totalRooms = (roomDetails.singleBedRooms || 0) +
+    (roomDetails.doubleBedRooms || 0) +
+    (roomDetails.familySuites || 0);
+
   if (totalRooms === 0) {
     return {
       totalRooms: 0,
@@ -327,30 +327,81 @@ export function calculateAverageRoomRate(roomDetails: RoomTypeDetails): AverageR
       lowestRate: 0
     };
   }
-  
+
   // Calculate total revenue per night
   const singleRevenue = (roomDetails.singleBedRooms || 0) * (roomDetails.singleBedRoomRate || 0);
   const doubleRevenue = (roomDetails.doubleBedRooms || 0) * (roomDetails.doubleBedRoomRate || 0);
   const suiteRevenue = (roomDetails.familySuites || 0) * (roomDetails.familySuiteRate || 0);
   const totalRevenue = singleRevenue + doubleRevenue + suiteRevenue;
-  
+
   // Calculate average rate per room
   const averageRate = totalRevenue / totalRooms;
-  
+
   // Find highest and lowest rates (excluding zero rates)
   const rates: number[] = [];
   if (roomDetails.singleBedRooms && roomDetails.singleBedRoomRate) rates.push(roomDetails.singleBedRoomRate);
   if (roomDetails.doubleBedRooms && roomDetails.doubleBedRoomRate) rates.push(roomDetails.doubleBedRoomRate);
   if (roomDetails.familySuites && roomDetails.familySuiteRate) rates.push(roomDetails.familySuiteRate);
-  
+
   const highestRate = rates.length > 0 ? Math.max(...rates) : 0;
   const lowestRate = rates.length > 0 ? Math.min(...rates) : 0;
-  
+
   return {
     totalRooms,
     totalRevenue,
     averageRate: Math.round(averageRate * 100) / 100,
     highestRate,
     lowestRate
+  };
+}
+
+/**
+ * Calculate upgrade fee (Change Category)
+ * User pays the difference between new and old category fees
+ * Returns 0 if downgrading or no change
+ */
+export function calculateUpgradeFee(
+  oldCategory: CategoryType,
+  newCategory: CategoryType,
+  locationType: LocationType,
+  validityYears: 1 | 3,
+  ownerGender: 'male' | 'female' | 'other',
+  isPangiSubDivision: boolean
+): FeeBreakdown {
+
+  // Calculate full fee for old category
+  const oldFee = calculateHomestayFee({
+    category: oldCategory,
+    locationType,
+    validityYears,
+    ownerGender,
+    isPangiSubDivision
+  });
+
+  // Calculate full fee for new category
+  const newFee = calculateHomestayFee({
+    category: newCategory,
+    locationType,
+    validityYears,
+    ownerGender,
+    isPangiSubDivision
+  });
+
+  // Calculate difference
+  const diff = newFee.finalFee - oldFee.finalFee;
+  const upgradeFee = Math.max(0, diff); // No refund for downgrade
+
+  return {
+    ...newFee,
+    baseFee: upgradeFee, // The payable amount is now the difference
+    totalBeforeDiscounts: upgradeFee,
+    // Reset discounts for the upgrade delta view since they are implicit in the diff
+    validityDiscount: 0,
+    femaleOwnerDiscount: 0,
+    pangiDiscount: 0,
+    totalDiscount: 0,
+    finalFee: upgradeFee,
+    savingsAmount: 0,
+    savingsPercentage: 0
   };
 }

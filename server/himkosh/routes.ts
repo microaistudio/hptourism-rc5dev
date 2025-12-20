@@ -804,6 +804,18 @@ router.post('/callback', async (req, res) => {
           })
           .where(eq(homestayApplications.id, transaction.applicationId));
 
+        // Application Lifecycle: If this was a service request (Add Rooms, etc.),
+        // mark the parent application as superseded to prevent duplicates.
+        if (currentApplication.parentApplicationId) {
+          await db
+            .update(homestayApplications)
+            .set({
+              status: 'superseded',
+              districtNotes: `Superseded by application ${currentApplication.applicationNumber}`
+            })
+            .where(eq(homestayApplications.id, currentApplication.parentApplicationId));
+        }
+
         const actorId =
           currentApplication?.dtdoId ??
           currentApplication?.daId ??

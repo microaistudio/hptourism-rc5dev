@@ -152,89 +152,139 @@ const resolveTehsilFields = (rawTehsil: unknown, rawTehsilOther: unknown) => {
   };
 };
 
+// Helper to remove undefined keys so Drizzle ignores them during update
+const removeUndefinedKeys = (obj: any) => {
+  Object.keys(obj).forEach(key => obj[key] === undefined && delete obj[key]);
+  return obj;
+};
+
 const sanitizeDraftForPersistence = (
   validatedData: any,
   draftOwner: Awaited<ReturnType<typeof storage.getUser>> | null,
+  isPartial = false,
 ) => {
   const normalizedDocuments = normalizeDocumentsForPersistence(validatedData.documents);
-  const { tehsil: resolvedTehsil, tehsilOther: resolvedTehsilOther } = resolveTehsilFields(
-    validatedData.tehsil,
-    validatedData.tehsilOther,
-  );
+
+  // Helper to conditionally apply defaults
+  // If isPartial is true AND value is undefined, return undefined (don't update)
+  // Otherwise apply normalization/defaults
+  const sStr = (val: unknown, fallback: string = "", max?: number) =>
+    (isPartial && val === undefined) ? undefined : normalizeStringField(val, fallback, max);
+
+  const sNum = (val: unknown, fallback?: number) =>
+    (isPartial && val === undefined) ? undefined : coerceNumberField(val, fallback);
+
+  // Special handling for tehsil due to interdependent fields
+  let resolvedTehsil: string | undefined | null = undefined;
+  let resolvedTehsilOther: string | undefined | null = undefined;
+
+  // If either tehsil field is present, or if it's a full Save/POST (not partial), we resolve
+  if (!isPartial || validatedData.tehsil !== undefined || validatedData.tehsilOther !== undefined) {
+    const { tehsil, tehsilOther } = resolveTehsilFields(
+      validatedData.tehsil,
+      validatedData.tehsilOther,
+    );
+    resolvedTehsil = tehsil;
+    resolvedTehsilOther = tehsilOther;
+  }
+
   const fallbackOwnerName = normalizeStringField(draftOwner?.fullName, "Draft Owner");
   const fallbackOwnerMobile = normalizeStringField(draftOwner?.mobile, "0000000000");
   const fallbackOwnerEmail = normalizeStringField(draftOwner?.email, "");
 
-  return {
+  // Clean the object
+  const result = {
     ...validatedData,
-    propertyName: normalizeStringField(validatedData.propertyName, "Draft Homestay"),
-    category: validatedData.category || "silver",
-    locationType: validatedData.locationType || "gp",
-    district: normalizeStringField(validatedData.district),
-    tehsil: resolvedTehsil,
-    tehsilOther: resolvedTehsilOther,
-    block: normalizeStringField(validatedData.block),
-    blockOther: normalizeStringField(validatedData.blockOther),
-    gramPanchayat: normalizeStringField(validatedData.gramPanchayat),
-    gramPanchayatOther: normalizeStringField(validatedData.gramPanchayatOther),
-    urbanBody: normalizeStringField(validatedData.urbanBody),
-    urbanBodyOther: normalizeStringField(validatedData.urbanBodyOther),
-    ward: normalizeStringField(validatedData.ward),
-    address: normalizeStringField(validatedData.address),
-    pincode: normalizeStringField(validatedData.pincode, "", 10),
-    telephone: normalizeStringField(validatedData.telephone, "", 20),
-    ownerName: normalizeStringField(validatedData.ownerName, fallbackOwnerName),
-    ownerGender: validatedData.ownerGender || "other",
-    ownerMobile: normalizeStringField(validatedData.ownerMobile, fallbackOwnerMobile, 15),
-    ownerEmail: normalizeStringField(validatedData.ownerEmail, fallbackOwnerEmail),
-    ownerAadhaar: normalizeStringField(validatedData.ownerAadhaar, "000000000000", 12),
+    propertyName: sStr(validatedData.propertyName, "Draft Homestay"),
+    category: validatedData.category || (isPartial ? undefined : "silver"),
+    locationType: validatedData.locationType || (isPartial ? undefined : "gp"),
+    district: sStr(validatedData.district),
+    // Only update tehsil if we resolved it
+    ...(resolvedTehsil !== undefined ? { tehsil: resolvedTehsil } : {}),
+    ...(resolvedTehsilOther !== undefined ? { tehsilOther: resolvedTehsilOther } : {}),
+
+    block: sStr(validatedData.block),
+    blockOther: sStr(validatedData.blockOther),
+    gramPanchayat: sStr(validatedData.gramPanchayat),
+    gramPanchayatOther: sStr(validatedData.gramPanchayatOther),
+    urbanBody: sStr(validatedData.urbanBody),
+    urbanBodyOther: sStr(validatedData.urbanBodyOther),
+    ward: sStr(validatedData.ward),
+    address: sStr(validatedData.address),
+    pincode: sStr(validatedData.pincode, "", 10),
+    telephone: sStr(validatedData.telephone, "", 20),
+    ownerName: sStr(validatedData.ownerName, fallbackOwnerName),
+    ownerGender: validatedData.ownerGender || (isPartial ? undefined : "other"),
+    ownerMobile: sStr(validatedData.ownerMobile, fallbackOwnerMobile, 15),
+    ownerEmail: sStr(validatedData.ownerEmail, fallbackOwnerEmail),
+    ownerAadhaar: sStr(validatedData.ownerAadhaar, "000000000000", 12),
     propertyOwnership: validatedData.propertyOwnership === "leased" ? "leased" : "owned",
-    projectType: validatedData.projectType || "new_project",
-    propertyArea: coerceNumberField(validatedData.propertyArea),
-    singleBedRooms: coerceNumberField(validatedData.singleBedRooms),
-    singleBedBeds: coerceNumberField(validatedData.singleBedBeds, 1),
-    singleBedRoomSize: coerceNumberField(validatedData.singleBedRoomSize),
-    singleBedRoomRate: coerceNumberField(validatedData.singleBedRoomRate),
-    doubleBedRooms: coerceNumberField(validatedData.doubleBedRooms),
-    doubleBedBeds: coerceNumberField(validatedData.doubleBedBeds, 2),
-    doubleBedRoomSize: coerceNumberField(validatedData.doubleBedRoomSize),
-    doubleBedRoomRate: coerceNumberField(validatedData.doubleBedRoomRate),
-    familySuites: coerceNumberField(validatedData.familySuites),
-    familySuiteBeds: coerceNumberField(validatedData.familySuiteBeds, 4),
-    familySuiteSize: coerceNumberField(validatedData.familySuiteSize),
-    familySuiteRate: coerceNumberField(validatedData.familySuiteRate),
-    attachedWashrooms: coerceNumberField(validatedData.attachedWashrooms),
-    gstin: normalizeStringField(validatedData.gstin, "", 15),
-    selectedCategory: validatedData.selectedCategory || validatedData.category || "silver",
-    averageRoomRate: coerceNumberField(validatedData.averageRoomRate),
-    highestRoomRate: coerceNumberField(validatedData.highestRoomRate),
-    lowestRoomRate: coerceNumberField(validatedData.lowestRoomRate),
-    certificateValidityYears: validatedData.certificateValidityYears ?? 1,
-    isPangiSubDivision: validatedData.isPangiSubDivision ?? false,
-    distanceAirport: coerceNumberField(validatedData.distanceAirport),
-    distanceRailway: coerceNumberField(validatedData.distanceRailway),
-    distanceCityCenter: coerceNumberField(validatedData.distanceCityCenter),
-    distanceShopping: coerceNumberField(validatedData.distanceShopping),
-    distanceBusStand: coerceNumberField(validatedData.distanceBusStand),
-    lobbyArea: coerceNumberField(validatedData.lobbyArea),
-    diningArea: coerceNumberField(validatedData.diningArea),
-    parkingArea: normalizeStringField(validatedData.parkingArea),
-    ecoFriendlyFacilities: normalizeStringField(validatedData.ecoFriendlyFacilities),
-    differentlyAbledFacilities: normalizeStringField(validatedData.differentlyAbledFacilities),
-    fireEquipmentDetails: normalizeStringField(validatedData.fireEquipmentDetails),
-    nearestHospital: normalizeStringField(validatedData.nearestHospital),
-    documents: normalizedDocuments ?? [],
-    baseFee: coerceNumberField(validatedData.baseFee),
-    totalBeforeDiscounts: coerceNumberField(validatedData.totalBeforeDiscounts),
-    validityDiscount: coerceNumberField(validatedData.validityDiscount),
-    femaleOwnerDiscount: coerceNumberField(validatedData.femaleOwnerDiscount),
-    pangiDiscount: coerceNumberField(validatedData.pangiDiscount),
-    totalDiscount: coerceNumberField(validatedData.totalDiscount),
-    totalFee: coerceNumberField(validatedData.totalFee),
-    perRoomFee: coerceNumberField(validatedData.perRoomFee),
-    gstAmount: coerceNumberField(validatedData.gstAmount),
+    projectType: validatedData.projectType || (isPartial ? undefined : "new_project"),
+    propertyArea: sNum(validatedData.propertyArea),
+    singleBedRooms: sNum(validatedData.singleBedRooms),
+    singleBedBeds: sNum(validatedData.singleBedBeds, 1),
+    singleBedRoomSize: sNum(validatedData.singleBedRoomSize),
+    singleBedRoomRate: sNum(validatedData.singleBedRoomRate),
+    doubleBedRooms: sNum(validatedData.doubleBedRooms),
+    doubleBedBeds: sNum(validatedData.doubleBedBeds, 2),
+    doubleBedRoomSize: sNum(validatedData.doubleBedRoomSize),
+    doubleBedRoomRate: sNum(validatedData.doubleBedRoomRate),
+    familySuites: sNum(validatedData.familySuites),
+    familySuiteBeds: sNum(validatedData.familySuiteBeds, 4),
+    familySuiteSize: sNum(validatedData.familySuiteSize),
+    familySuiteRate: sNum(validatedData.familySuiteRate),
+    attachedWashrooms: sNum(validatedData.attachedWashrooms),
+    gstin: sStr(validatedData.gstin, "", 15),
+    selectedCategory: validatedData.selectedCategory || validatedData.category || (isPartial ? undefined : "silver"),
+    averageRoomRate: sNum(validatedData.averageRoomRate),
+    highestRoomRate: sNum(validatedData.highestRoomRate),
+    lowestRoomRate: sNum(validatedData.lowestRoomRate),
+    certificateValidityYears: validatedData.certificateValidityYears ?? (isPartial ? undefined : 1),
+    isPangiSubDivision: validatedData.isPangiSubDivision ?? (isPartial ? undefined : false),
+    distanceAirport: sNum(validatedData.distanceAirport),
+    distanceRailway: sNum(validatedData.distanceRailway),
+    distanceCityCenter: sNum(validatedData.distanceCityCenter),
+    distanceShopping: sNum(validatedData.distanceShopping),
+    distanceBusStand: sNum(validatedData.distanceBusStand),
+    lobbyArea: sNum(validatedData.lobbyArea),
+    diningArea: sNum(validatedData.diningArea),
+    parkingArea: sStr(validatedData.parkingArea),
+    ecoFriendlyFacilities: sStr(validatedData.ecoFriendlyFacilities),
+    differentlyAbledFacilities: sStr(validatedData.differentlyAbledFacilities),
+    fireEquipmentDetails: sStr(validatedData.fireEquipmentDetails),
+    nearestHospital: sStr(validatedData.nearestHospital),
+    amenities: validatedData.amenities, // Ensure amenities are passed through
+    nearbyAttractions: validatedData.nearbyAttractions, // Ensure nearbyAttractions are passed through
+    // For documents: if not present in partial update, leave undefined. Default to [] only for full updates.
+    documents: isPartial && normalizedDocuments === undefined ? undefined : (normalizedDocuments ?? []),
+    baseFee: sNum(validatedData.baseFee),
+    totalBeforeDiscounts: sNum(validatedData.totalBeforeDiscounts),
+    validityDiscount: sNum(validatedData.validityDiscount),
+    femaleOwnerDiscount: sNum(validatedData.femaleOwnerDiscount),
+    pangiDiscount: sNum(validatedData.pangiDiscount),
+    totalDiscount: sNum(validatedData.totalDiscount),
+    totalFee: sNum(validatedData.totalFee),
+    perRoomFee: sNum(validatedData.perRoomFee),
+    gstAmount: sNum(validatedData.gstAmount),
   };
+
+  return removeUndefinedKeys(result);
 };
+
+
+
+// I will wrap the return
+// But wait, there was no removeUndefinedKeys in original.
+// If Drizzle receives undefined, it might crash or set NULL?
+// It usually ignores it in update.
+
+// I'll add a simple recursive undefined remover or just use JSON cleaning logic if needed.
+// 'removeUndefined' helper was imported at line 22!
+// "import { removeUndefined } from "../helpers/object";"
+// So I should use it!
+
+// Re-structuring the return to use removeUndefined
+
 
 const toNumberFromUnknown = (value: unknown) => {
   if (typeof value === "number") {
@@ -604,13 +654,27 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
           });
         }
       } else {
-        // SERVICE REQUEST LOGIC (Add/Delete Rooms, Cancel, etc.)
+        // SERVICE REQUEST LOGIC (Add/Delete Rooms, Cancel, Change Category, etc.)
 
         // 1. Must have an APPROVED parent application
-        // We look for the main registration or the latest approved state
-        parentApp = existingApps.find(app => app.status === 'approved' && (!app.applicationKind || app.applicationKind === 'new_registration' || app.applicationKind === 'renewal'));
+        // If parentApplicationId is explicitly provided, use that; otherwise find any approved application
+        const explicitParentId = body.parentApplicationId;
+        console.log('[DEBUG /draft] applicationKind:', applicationKind);
+        console.log('[DEBUG /draft] explicitParentId:', explicitParentId);
+        console.log('[DEBUG /draft] existingApps count:', existingApps.length);
+        console.log('[DEBUG /draft] existingApps statuses:', existingApps.map(a => ({ id: a.id, status: a.status, kind: a.applicationKind })));
+
+        if (explicitParentId) {
+          parentApp = existingApps.find(app => app.id === explicitParentId && app.status === 'approved');
+          console.log('[DEBUG /draft] Found by explicitParentId:', parentApp ? parentApp.id : 'NOT FOUND');
+        } else {
+          // Fallback: find the first approved application (new registration, renewal, or existing RC)
+          parentApp = existingApps.find(app => app.status === 'approved');
+          console.log('[DEBUG /draft] Found by fallback:', parentApp ? parentApp.id : 'NOT FOUND');
+        }
 
         if (!parentApp) {
+          console.log('[DEBUG /draft] RETURNING 400 - no approved parent found');
           return res.status(400).json({
             message: "You must have an approved Homestay Registration before applying for amendments or cancellation."
           });
@@ -618,9 +682,9 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
 
         // 2. Check for pending service requests
         // (Prevent starting "Add Rooms" if "timely_renewal" is already open, etc.)
+        const closedStatuses = ['approved', 'rejected', 'superseded', 'certificate_cancelled'];
         const openServiceRequest = existingApps.find(app =>
-          app.status !== 'approved' &&
-          app.status !== 'rejected' &&
+          !closedStatuses.includes(app.status || '') &&
           app.applicationKind !== 'new_registration'
         );
 
@@ -638,6 +702,7 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
           // Core Identity
           propertyName: parentApp.propertyName ?? undefined,
           ownerName: parentApp.ownerName ?? undefined,
+          ownerGender: parentApp.ownerGender ?? 'male', // Default to 'male' if not set
           ownerMobile: parentApp.ownerMobile ?? undefined,
           ownerEmail: parentApp.ownerEmail ?? undefined,
           ownerAadhaar: parentApp.ownerAadhaar ?? undefined,
@@ -662,6 +727,8 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
           selectedCategory: (parentApp.category ?? undefined) as any, // Start with current
           totalRooms: parentApp.totalRooms ?? undefined,
           propertyArea: parentApp.propertyArea ? Number(parentApp.propertyArea) : undefined,
+          projectType: (parentApp.projectType ?? 'new_project') as any, // Default if not set
+          propertyOwnership: (parentApp.propertyOwnership ?? 'owned') as any, // Default if not set
 
           // Room Configs
           singleBedRooms: parentApp.singleBedRooms ?? 0,
@@ -694,7 +761,7 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
       // 4. Validate and Save
       // We use the draftSchema validation but applied to our merged data
       const validatedData = serviceRequestDraftSchema.parse(draftData);
-      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user);
+      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user, true);
 
       // Ensure required linkage fields are preserved after sanitation
       if (applicationKind !== 'new_registration') {
@@ -748,17 +815,25 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
       }
 
       const validatedData = draftSchema.parse(req.body);
+      console.log("[draft:update] Payload validated");
+
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(401).json({ message: "Authentication required" });
       }
-      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user);
+
+      console.log("[draft:update] Sanitizing draft...");
+      const sanitizedDraft = sanitizeDraftForPersistence(validatedData, user, true);
+      console.log("[draft:update] Draft sanitized");
+
       const policy = await getUploadPolicy();
+      console.log("[draft:update] Validating documents...");
       const draftDocsError = validateDocumentsAgainstPolicy(
         sanitizedDraft.documents as NormalizedDocumentRecord[] | undefined,
         policy,
       );
       if (draftDocsError) {
+        console.log("[draft:update] Document validation failed:", draftDocsError);
         return res.status(400).json({ message: draftDocsError });
       }
 
@@ -767,13 +842,22 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
         (sanitizedDraft.doubleBedRooms || 0) +
         (sanitizedDraft.familySuites || 0);
 
+      console.log("[draft:update] Updating database...");
       const updated = await storage.updateApplication(id, {
         ...sanitizedDraft,
         totalRooms: totalRooms || existing.totalRooms,
       } as any);
+      console.log("[draft:update] Database updated successfully");
 
       res.json({ application: updated, message: "Draft updated successfully" });
     } catch (error) {
+      console.error("[draft:update] CRITIAL ERROR:", error);
+      if (error instanceof Error) {
+        console.error(error.stack);
+      }
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       ownerLog.error({ err: error }, "[draft:update] Failed to update draft");
       res.status(500).json({ message: "Failed to update draft" });
     }
@@ -1362,6 +1446,7 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
       }
 
       if (application.status !== "draft") {
+        console.log('[DEBUG DELETE] Application status is not draft:', application.status, 'id:', id);
         return res.status(400).json({
           message:
             "Only draft applications can be deleted. Please contact support if you need to withdraw a submitted application.",

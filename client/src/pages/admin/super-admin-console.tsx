@@ -51,6 +51,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { CommunicationsCard } from "@/components/admin/communications-card";
 import { NotificationRulesCard } from "@/components/admin/notification-rules-card";
+import { PortalConfigCard } from "@/components/admin/portal-config-card";
 import type { HimkoshTransaction } from "@shared/schema";
 
 interface SystemStats {
@@ -282,6 +283,7 @@ const SECTION_LINKS = [
   { id: "communications", label: "Communications" },
   { id: "security", label: "Security" },
   { id: "staff-tools", label: "District Staff" },
+  { id: "portal-config", label: "Portal Config" },
   { id: "smoke-tests", label: "Smoke Tests" },
   { id: "test-data", label: "Test Data" },
 ];
@@ -2692,6 +2694,10 @@ export default function SuperAdminConsole() {
                 )}
               </CardContent>
             </Card>
+          </section>
+
+          <section id="portal-config" className="space-y-4">
+            <PortalConfigCard />
           </section>
 
           <section id="smoke-tests" className="space-y-4">

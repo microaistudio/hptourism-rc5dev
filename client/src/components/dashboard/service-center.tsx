@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,10 +13,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Trash2, Loader2 } from "lucide-react";
+import { RoomDeltaModal } from "./RoomDeltaModal";
 
 type ServiceRequestSummary = {
   id: string;
@@ -75,6 +89,54 @@ export function ServiceCenterPanel() {
   const [, setLocation] = useLocation();
   const { data, isLoading, isError } = useQuery<{ applications: ServiceRequestSummary[] }>({
     queryKey: ["/api/service-center"],
+  });
+
+  // Room delta modal state
+  const [roomModalState, setRoomModalState] = useState<{
+    open: boolean;
+    mode: "add_rooms" | "delete_rooms";
+    parentId: string;
+    currentRooms: { single: number; double: number; family: number };
+  } | null>(null);
+
+  const openRoomModal = (
+    mode: "add_rooms" | "delete_rooms",
+    appId: string,
+    rooms: { single: number; double: number; family: number }
+  ) => {
+    setRoomModalState({ open: true, mode, parentId: appId, currentRooms: rooms });
+  };
+
+  const closeRoomModal = () => setRoomModalState(null);
+
+  const handleRoomModalSuccess = (nextUrl: string) => {
+    closeRoomModal();
+    setLocation(nextUrl);
+  };
+
+  // Discard draft state and mutation
+  const { toast } = useToast();
+  const [discardTarget, setDiscardTarget] = useState<{ id: string; kind: string } | null>(null);
+
+  const discardDraftMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/applications/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Draft Discarded",
+        description: "The incomplete service request has been removed. You can now start a new one.",
+      });
+      setDiscardTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/service-center"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to Discard",
+        description: error.message || "Could not remove the draft. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -202,6 +264,32 @@ export function ServiceCenterPanel() {
                   {activeRequestMessage}
                 </p>
 
+                {/* Show discard option for draft service requests */}
+                {application.activeServiceRequest && application.activeServiceRequest.status === "draft" && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs rounded-full border-amber-300 text-amber-700 hover:bg-amber-50"
+                      onClick={() => setLocation(`/applications/new?draft=${application.activeServiceRequest!.id}`)}
+                    >
+                      Resume Draft
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                      onClick={() => setDiscardTarget({
+                        id: application.activeServiceRequest!.id,
+                        kind: application.activeServiceRequest!.applicationKind,
+                      })}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Discard
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-3">
                   <Button
                     disabled={renewDisabled}
@@ -217,9 +305,7 @@ export function ServiceCenterPanel() {
                     variant="outline"
                     disabled={!application.canAddRooms || actionDisabled}
                     className="rounded-full border-slate-200"
-                    onClick={() => {
-                      setLocation(`/applications/service-request?type=add_rooms&parentId=${application.id}`);
-                    }}
+                    onClick={() => openRoomModal("add_rooms", application.id, application.rooms)}
                   >
                     Add Rooms
                   </Button>
@@ -233,9 +319,7 @@ export function ServiceCenterPanel() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         disabled={!application.canDeleteRooms || actionDisabled}
-                        onClick={() => {
-                          setLocation(`/applications/service-request?type=delete_rooms&parentId=${application.id}`);
-                        }}
+                        onClick={() => openRoomModal("delete_rooms", application.id, application.rooms)}
                       >
                         Delete Rooms
                       </DropdownMenuItem>
@@ -265,6 +349,43 @@ export function ServiceCenterPanel() {
           );
         })}
       </div>
+
+      {/* Room Delta Modal */}
+      {roomModalState && (
+        <RoomDeltaModal
+          open={roomModalState.open}
+          onOpenChange={(open) => !open && closeRoomModal()}
+          mode={roomModalState.mode}
+          parentApplicationId={roomModalState.parentId}
+          currentRooms={roomModalState.currentRooms}
+          onSuccess={handleRoomModalSuccess}
+        />
+      )}
+
+      {/* Discard Confirmation Dialog */}
+      <AlertDialog open={!!discardTarget} onOpenChange={(open) => !open && setDiscardTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard Service Request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete your{" "}
+              <strong>{discardTarget?.kind.replace(/_/g, " ")}</strong> draft.
+              You can start a new service request after discarding.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => discardTarget && discardDraftMutation.mutate(discardTarget.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={discardDraftMutation.isPending}
+            >
+              {discardDraftMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Discard Draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

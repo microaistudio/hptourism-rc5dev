@@ -22,6 +22,7 @@ interface Step5DocumentsProps {
     requiresCommercialUtilityProof: boolean;
     isCorrection?: boolean;
     correctionNotes?: string;
+    applicationKind?: string;
 }
 
 export function Step5Documents({
@@ -34,6 +35,7 @@ export function Step5Documents({
     requiresCommercialUtilityProof,
     isCorrection = false,
     correctionNotes,
+    applicationKind,
 }: Step5DocumentsProps) {
 
     return (
@@ -203,14 +205,17 @@ export function Step5Documents({
 
                 {/* Validation Messages */}
                 {(() => {
-                    const missingRevenue = uploadedDocuments.revenuePapers.length === 0;
-                    const missingAffidavit = uploadedDocuments.affidavitSection29.length === 0;
-                    const missingUndertaking = uploadedDocuments.undertakingFormC.length === 0;
+                    console.log("Step5Documents applicationKind:", applicationKind);
+                    const isDeleteRooms = applicationKind === 'delete_rooms';
+
+                    const missingRevenue = !isDeleteRooms && uploadedDocuments.revenuePapers.length === 0;
+                    const missingAffidavit = !isDeleteRooms && uploadedDocuments.affidavitSection29.length === 0;
+                    const missingUndertaking = !isDeleteRooms && uploadedDocuments.undertakingFormC.length === 0;
                     const missingElectricity =
-                        requiresCommercialUtilityProof && uploadedDocuments.commercialElectricityBill.length === 0;
+                        !isDeleteRooms && requiresCommercialUtilityProof && uploadedDocuments.commercialElectricityBill.length === 0;
                     const missingWater =
-                        requiresCommercialUtilityProof && uploadedDocuments.commercialWaterBill.length === 0;
-                    const missingPhotos = propertyPhotos.length < 2;
+                        !isDeleteRooms && requiresCommercialUtilityProof && uploadedDocuments.commercialWaterBill.length === 0;
+                    const missingPhotos = !isDeleteRooms && propertyPhotos.length < 2;
                     const showWarning =
                         missingRevenue ||
                         missingAffidavit ||

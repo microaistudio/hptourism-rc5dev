@@ -149,7 +149,7 @@ export default function ServiceRequestHandler() {
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => {
                             if (conflictDetails?.id) {
-                                setLocation(`/applications/${conflictDetails.id}`);
+                                setLocation(`/applications/new?draft=${conflictDetails.id}`);
                             } else {
                                 setLocation("/dashboard");
                             }

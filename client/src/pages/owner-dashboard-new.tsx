@@ -527,7 +527,7 @@ export default function OwnerDashboardNew() {
 
             {/* Document Readiness Check Dialog */}
             <Dialog open={showReadinessDialog} onOpenChange={setShowReadinessDialog}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl">
                             <ClipboardCheck className="w-6 h-6 text-emerald-600" />

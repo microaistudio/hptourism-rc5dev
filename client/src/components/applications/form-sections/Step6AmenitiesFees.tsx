@@ -27,6 +27,13 @@ interface FeeCalculation {
     savingsPercentage: number;
 }
 
+interface UpgradeFeeInfo {
+    previousCategory: CategoryType;
+    previousCategoryFee: number;
+    newCategoryFee: number;
+    upgradeFee: number;
+}
+
 interface Step6AmenitiesFeesProps {
     form: UseFormReturn<ApplicationForm>;
     selectedAmenities: Record<string, boolean>;
@@ -43,6 +50,8 @@ interface Step6AmenitiesFeesProps {
     activeDraftApplication: any;
     correctionId: string | null;
     selectedAmenitiesCount: number;
+    isUpgrade?: boolean;
+    upgradeFeeInfo?: UpgradeFeeInfo;
 }
 
 export function Step6AmenitiesFees({
@@ -61,6 +70,8 @@ export function Step6AmenitiesFees({
     activeDraftApplication,
     correctionId,
     selectedAmenitiesCount,
+    isUpgrade = false,
+    upgradeFeeInfo,
 }: Step6AmenitiesFeesProps) {
     return (
         <Card>
@@ -266,15 +277,42 @@ export function Step6AmenitiesFees({
                                 <span className="font-medium">{certificateValidityYears} {certificateValidityYears === "1" ? "year" : "years"}</span>
                             </div>
                             <div className="border-t pt-3 mt-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Base Fee (Annual)</span>
-                                    <span className="font-medium">₹{fees.baseFee.toFixed(0)}</span>
-                                </div>
-                                {certificateValidityYears === "3" && (
-                                    <div className="flex justify-between mt-2">
-                                        <span className="text-muted-foreground">Total ({certificateValidityYears} years)</span>
-                                        <span className="font-medium">₹{(fees.baseFee * 3).toFixed(0)}</span>
-                                    </div>
+                                {isUpgrade && upgradeFeeInfo ? (
+                                    /* Upgrade Fee Breakdown */
+                                    <>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">
+                                                New Category Fee ({getCategoryBadge(category).label})
+                                            </span>
+                                            <span className="font-medium">₹{upgradeFeeInfo.newCategoryFee.toFixed(0)}</span>
+                                        </div>
+                                        <div className="flex justify-between mt-2">
+                                            <span className="text-muted-foreground">
+                                                Fee Already Paid ({getCategoryBadge(upgradeFeeInfo.previousCategory).label})
+                                            </span>
+                                            <span className="font-medium text-green-600">−₹{upgradeFeeInfo.previousCategoryFee.toFixed(0)}</span>
+                                        </div>
+                                        <div className="border-t pt-2 mt-2">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground font-medium">Upgrade Amount</span>
+                                                <span className="font-medium">₹{upgradeFeeInfo.upgradeFee.toFixed(0)}</span>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* Regular Fee Display */
+                                    <>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Base Fee (Annual)</span>
+                                            <span className="font-medium">₹{fees.baseFee.toFixed(0)}</span>
+                                        </div>
+                                        {certificateValidityYears === "3" && (
+                                            <div className="flex justify-between mt-2">
+                                                <span className="text-muted-foreground">Total ({certificateValidityYears} years)</span>
+                                                <span className="font-medium">₹{(fees.baseFee * 3).toFixed(0)}</span>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
                             </div>
                             {(fees.validityDiscount > 0 || fees.femaleOwnerDiscount > 0 || fees.pangiDiscount > 0) && (

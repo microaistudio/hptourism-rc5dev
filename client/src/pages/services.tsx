@@ -114,6 +114,14 @@ export default function ServiceSelection() {
         retry: false,
     });
 
+    // Fetch public settings for service visibility
+    const { data: settingsData } = useQuery<{
+        serviceVisibility: Record<string, boolean>;
+        inspectionConfig: { optionalKinds: string[] };
+    }>({
+        queryKey: ["/api/settings/public"],
+    });
+
     // Redirect to login if not authenticated
     useEffect(() => {
         if (!isLoading && !userData?.user) {
@@ -188,7 +196,20 @@ export default function ServiceSelection() {
 
                 {/* Service Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {SERVICES.map((service) => {
+                    {SERVICES.filter(service => {
+                        // Always show Homestay
+                        if (service.id === 'homestay') return true;
+
+                        // Check visibility setting if available
+                        if (settingsData?.serviceVisibility) {
+                            return settingsData.serviceVisibility[service.id as keyof typeof settingsData.serviceVisibility];
+                        }
+
+                        // Fallback: Show only Homestay and Adventure Tourism by default if no settings
+                        if (service.id === 'adventure_tourism') return true;
+
+                        return false;
+                    }).map((service) => {
                         const Icon = service.icon;
                         const isClickable = service.status !== "development";
 

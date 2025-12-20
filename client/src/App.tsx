@@ -3,7 +3,7 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { DevConsole } from "@/components/dev-console";
+// DevConsole removed - dangerous in production
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthLayout } from "@/components/auth-layout";
 import { getDefaultRouteForRole } from "@/config/navigation";
@@ -284,7 +284,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
-          <DevConsole />
+          {/* DevConsole removed for production safety */}
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

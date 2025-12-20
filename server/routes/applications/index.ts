@@ -41,7 +41,8 @@ export function createApplicationsRouter() {
         return res.json({ application: null });
       }
       const applications = await storage.getApplicationsByUser(userId);
-      res.json({ application: applications[0] ?? null });
+      const activeApplications = applications.filter(app => app.status !== 'superseded');
+      res.json({ application: activeApplications[0] ?? null });
     } catch (error) {
       applicationsLog.error({ err: error, route: "/primary" }, "Failed to fetch primary application");
       res.status(500).json({ message: "Unable to load application overview" });
@@ -59,6 +60,7 @@ export function createApplicationsRouter() {
       let applications: Awaited<ReturnType<typeof storage.getApplicationsByUser>> = [];
       if (user.role === "property_owner") {
         applications = await storage.getApplicationsByUser(userId);
+        applications = applications.filter(app => app.status !== 'superseded');
       } else if (user.role === "district_officer" && user.district) {
         applications = await storage.getApplicationsByDistrict(user.district);
       } else if (["state_officer", "admin"].includes(user.role)) {

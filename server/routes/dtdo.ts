@@ -696,6 +696,15 @@ export function createDtdoRouter() {
                     districtReviewDate: new Date(),
                 });
 
+                // Application Lifecycle: If this was a service request (Add Rooms, etc.), 
+                // mark the parent application as superseded so it doesn't show as active/duplicate.
+                if (application.parentApplicationId) {
+                    await storage.updateApplication(application.parentApplicationId, {
+                        status: 'superseded',
+                        districtNotes: `Superseded by application ${application.applicationNumber}`
+                    });
+                }
+
                 await logApplicationAction({
                     applicationId,
                     actorId: userId,
@@ -945,6 +954,137 @@ export function createDtdoRouter() {
     // Profile and Password Management
     router.patch("/profile", requireRole('district_tourism_officer', 'district_officer'), handleStaffProfileUpdate);
     router.post("/change-password", requireRole('district_tourism_officer', 'district_officer'), handleStaffPasswordChange);
+
+    // DTDO approve without inspection (Bypass)
+    router.post("/applications/:id/approve-bypass", requireRole('district_tourism_officer', 'district_officer'), async (req, res) => {
+        try {
+            const { remarks } = req.body;
+            const userId = req.session.userId!;
+            const user = await storage.getUser(userId);
+
+            const application = await storage.getApplication(req.params.id);
+            if (!application) {
+                return res.status(404).json({ message: "Application not found" });
+            }
+
+            // Verify application is from DTDO's district
+            if (user?.district && !districtsMatch(user.district, application.district)) {
+                return res.status(403).json({ message: "You can only process applications from your district" });
+            }
+
+            // Verify global setting allows this bypass
+            const { getSystemSettingRecord } = await import("../services/systemSettings");
+            const inspectionSetting = await getSystemSettingRecord("inspection_config");
+            const optionalKinds = (inspectionSetting?.settingValue as { optionalKinds: string[] })?.optionalKinds || [];
+
+            if (!optionalKinds.includes(application.applicationKind)) {
+                return res.status(400).json({
+                    message: `Inspection bypass is not enabled for '${application.applicationKind}'. Please schedule an inspection.`
+                });
+            }
+
+            // Status Check: Should be in review stage
+            if (application.status !== 'forwarded_to_dtdo' && application.status !== 'dtdo_review') {
+                return res.status(400).json({ message: "Application is not in a reviewable status" });
+            }
+
+            // Logic for Cancel Certificate (Special Case)
+            if (application.applicationKind === 'cancel_certificate') {
+                // Reuse logic for cancellation matching the dedicated endpoint
+                // But strictly speaking, the dedicated endpoint /approve-cancellation (above) works too.
+                // However, the frontend might call this generic bypass for all "optional" types.
+                // Let's forward to standard cancellation logic effectively:
+
+                await storage.updateApplication(req.params.id, {
+                    status: 'certificate_cancelled',
+                    districtNotes: remarks || 'Cancellation approved (Inspection Skipped). Certificate revoked.',
+                    districtOfficerId: userId,
+                    districtReviewDate: new Date(),
+                    approvedAt: new Date(),
+                    certificateExpiryDate: new Date(),
+                });
+
+                if (application.parentApplicationId) {
+                    await storage.updateApplication(application.parentApplicationId, {
+                        status: 'certificate_cancelled',
+                        districtNotes: `Certificate revoked via cancellation request #${application.applicationNumber}. Remarks: ${remarks || 'Skipped Inspection'}`,
+                        certificateExpiryDate: new Date(),
+                    });
+                    await logApplicationAction({
+                        applicationId: application.parentApplicationId,
+                        actorId: userId,
+                        action: "certificate_revoked",
+                        previousStatus: "approved",
+                        newStatus: "certificate_cancelled",
+                        feedback: `Revoked via request #${application.applicationNumber} (Inspection Skipped)`,
+                    });
+                }
+                await logApplicationAction({
+                    applicationId: req.params.id,
+                    actorId: userId,
+                    action: "cancellation_approved_bypass",
+                    previousStatus: application.status,
+                    newStatus: "certificate_cancelled",
+                    feedback: remarks || 'Cancellation approved without inspection',
+                });
+                return res.json({ message: "Cancellation approved without inspection." });
+            }
+
+            // Standard Approval Logic (Issue Certificate)
+            const year = new Date().getFullYear();
+            const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+            const certificateNumber = `HP-HST-${year}-${randomSuffix}`;
+            const issueDate = new Date();
+            const expiryDate = new Date(issueDate);
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+            const approvedApplication = await storage.updateApplication(req.params.id, {
+                status: 'approved',
+                certificateNumber,
+                certificateIssuedDate: issueDate,
+                certificateExpiryDate: expiryDate,
+                approvedAt: issueDate,
+                dtdoId: userId,
+                districtNotes: remarks || 'Approved without inspection (Administrative Approval).',
+                districtOfficerId: userId,
+                districtReviewDate: new Date(),
+            });
+
+            // Supersede Parent logic
+            if (application.parentApplicationId) {
+                await storage.updateApplication(application.parentApplicationId, {
+                    status: 'superseded',
+                    districtNotes: `Superseded by application ${application.applicationNumber}`
+                });
+            }
+
+            await logApplicationAction({
+                applicationId: req.params.id,
+                actorId: userId,
+                action: "approved_bypass_inspection",
+                previousStatus: application.status,
+                newStatus: "approved",
+                feedback: remarks || `Approved without inspection (Configurable Bypass). Certificate ${certificateNumber} issued.`,
+            });
+
+            const owner = await storage.getUser(application.userId);
+            queueNotification("application_approved", {
+                application: approvedApplication ?? {
+                    ...application,
+                    status: 'approved',
+                    certificateNumber,
+                },
+                owner: owner ?? null,
+                extras: { REMARKS: "Your application has been approved directly." }
+            });
+
+            res.json({ message: "Application approved without inspection", certificateNumber });
+
+        } catch (error) {
+            routeLog.error("[dtdo] Failed to bypass approve application:", error);
+            res.status(500).json({ message: "Failed to process approval" });
+        }
+    });
 
     return router;
 }

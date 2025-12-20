@@ -396,5 +396,119 @@ export function createAdminSettingsRouter() {
     }
   });
 
+  // Service Visibility Settings
+  const SERVICE_VISIBILITY_KEY = "service_visibility_config";
+  const INSPECTION_CONFIG_KEY = "inspection_config";
+
+  router.get("/settings/portal/services", requireRole("admin", "super_admin"), async (_req, res) => {
+    try {
+      const [visibilitySetting, inspectionSetting] = await Promise.all([
+        getSystemSettingRecord(SERVICE_VISIBILITY_KEY),
+        getSystemSettingRecord(INSPECTION_CONFIG_KEY)
+      ]);
+
+      res.json({
+        visibility: visibilitySetting?.settingValue ?? {
+          homestay: true, // Always active
+          hotels: false,
+          guest_houses: false,
+          travel_agencies: false,
+          adventure_tourism: true, // Currently active in code
+          transport: false,
+          restaurants: false,
+          winter_sports: false
+        },
+        inspection: inspectionSetting?.settingValue ?? {
+          optionalKinds: [] // e.g. ['delete_rooms', 'cancel_certificate']
+        }
+      });
+    } catch (error) {
+      log.error({ err: error }, "[admin] Failed to fetch service settings");
+      res.status(500).json({ message: "Failed to fetch service settings" });
+    }
+  });
+
+  router.post("/settings/portal/services/toggle", requireRole("admin", "super_admin"), async (req, res) => {
+    try {
+      const { serviceId, enabled } = req.body;
+      const userId = req.session?.userId ?? null;
+
+      if (!serviceId) return res.status(400).json({ message: "Service ID required" });
+
+      const setting = await getSystemSettingRecord(SERVICE_VISIBILITY_KEY);
+      const currentConfig = (setting?.settingValue as Record<string, boolean>) ?? {
+        homestay: true,
+        hotels: false,
+        guest_houses: false,
+        travel_agencies: false,
+        adventure_tourism: true,
+        transport: false,
+        restaurants: false,
+        winter_sports: false
+      };
+
+      const newConfig = { ...currentConfig, [serviceId]: enabled };
+
+      if (setting) {
+        await db.update(systemSettings)
+          .set({ settingValue: newConfig, updatedBy: userId, updatedAt: new Date() })
+          .where(eq(systemSettings.settingKey, SERVICE_VISIBILITY_KEY));
+      } else {
+        await db.insert(systemSettings).values({
+          settingKey: SERVICE_VISIBILITY_KEY,
+          settingValue: newConfig,
+          description: "Controls which services are visible on the portal",
+          category: "portal",
+          updatedBy: userId
+        });
+      }
+
+      res.json(newConfig);
+    } catch (error) {
+      log.error({ err: error }, "[admin] Failed to toggle service visibility");
+      res.status(500).json({ message: "Failed to update service visibility" });
+    }
+  });
+
+  router.post("/settings/inspection/toggle", requireRole("admin", "super_admin"), async (req, res) => {
+    try {
+      const { applicationKind, optional } = req.body;
+      const userId = req.session?.userId ?? null;
+
+      if (!applicationKind) return res.status(400).json({ message: "Application Kind required" });
+
+      const setting = await getSystemSettingRecord(INSPECTION_CONFIG_KEY);
+      const currentConfig = (setting?.settingValue as { optionalKinds: string[] }) ?? { optionalKinds: [] };
+
+      const currentSet = new Set(currentConfig.optionalKinds || []);
+      if (optional) {
+        currentSet.add(applicationKind);
+      } else {
+        currentSet.delete(applicationKind);
+      }
+
+      const newConfig = { optionalKinds: Array.from(currentSet) };
+
+      if (setting) {
+        await db.update(systemSettings)
+          .set({ settingValue: newConfig, updatedBy: userId, updatedAt: new Date() })
+          .where(eq(systemSettings.settingKey, INSPECTION_CONFIG_KEY));
+      } else {
+        await db.insert(systemSettings).values({
+          settingKey: INSPECTION_CONFIG_KEY,
+          settingValue: newConfig,
+          description: "Configuration for inspection workflows (e.g. optional inspections)",
+          category: "workflow",
+          updatedBy: userId
+        });
+      }
+
+      res.json(newConfig);
+    } catch (error) {
+      log.error({ err: error }, "[admin] Failed to toggle inspection config");
+      res.status(500).json({ message: "Failed to update inspection config" });
+    }
+  });
+
   return router;
 }

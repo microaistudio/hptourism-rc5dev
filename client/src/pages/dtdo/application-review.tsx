@@ -79,7 +79,7 @@ export default function DTDOApplicationReview() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const [actionType, setActionType] = useState<'accept' | 'reject' | 'revert' | 'approve-cancellation' | null>(null);
+  const [actionType, setActionType] = useState<'accept' | 'reject' | 'revert' | 'approve-cancellation' | 'approve-bypass' | null>(null);
   const [remarks, setRemarks] = useState("");
   const [previewDoc, setPreviewDoc] = useState<HomestayDocument | null>(null);
   const [copied, setCopied] = useState(false);
@@ -94,6 +94,10 @@ export default function DTDOApplicationReview() {
 
   const { data, isLoading } = useQuery<ApplicationData>({
     queryKey: ["/api/dtdo/applications", id],
+  });
+
+  const { data: settings } = useQuery<{ inspectionConfig: { optionalKinds: string[] } }>({
+    queryKey: ["/api/settings/public"],
   });
 
   const actionMutation = useMutation({
@@ -253,13 +257,13 @@ export default function DTDOApplicationReview() {
       mimeType: doc.mimeType,
     });
 
-  const handleAction = (action: 'accept' | 'reject' | 'revert' | 'approve-cancellation') => {
+  const handleAction = (action: 'accept' | 'reject' | 'revert' | 'approve-cancellation' | 'approve-bypass') => {
     setActionType(action);
     setRemarks("");
   };
 
   const actionRequiresRemarks = (action: typeof actionType) =>
-    action === 'accept' || action === 'reject' || action === 'revert' || action === 'approve-cancellation';
+    action === 'accept' || action === 'reject' || action === 'revert' || action === 'approve-cancellation' || action === 'approve-bypass';
 
   const confirmAction = () => {
     if (!actionType) return;
@@ -679,16 +683,7 @@ export default function DTDOApplicationReview() {
                 <CardDescription>Review and take action on this application</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button
-                  className="w-full"
-                  variant="default"
-                  onClick={() => handleAction('accept')}
-                  disabled={actionMutation.isPending}
-                  data-testid="button-accept"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Accept & Schedule Inspection
-                </Button>
+
 
                 {application?.applicationKind === 'cancel_certificate' ? (
                   <Button
@@ -711,6 +706,20 @@ export default function DTDOApplicationReview() {
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Accept & Schedule Inspection
+                  </Button>
+                )}
+
+                {/* Optional Inspection Bypass */}
+                {settings?.inspectionConfig?.optionalKinds?.includes(application?.applicationKind || '') && (
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={() => handleAction('approve-bypass')}
+                    disabled={actionMutation.isPending}
+                    data-testid="button-approve-bypass"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Approve (Skip Inspection)
                   </Button>
                 )}
 
@@ -855,6 +864,7 @@ export default function DTDOApplicationReview() {
               {actionType === 'accept' && 'This will schedule an inspection for the property.'}
               {actionType === 'reject' && 'This will permanently reject the application. Please provide rejection reason.'}
               {actionType === 'revert' && 'This will send the application back to the applicant for corrections. Please provide details.'}
+              {actionType === 'approve-bypass' && 'This will approve the application immediately without an inspection field visit.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -872,7 +882,9 @@ export default function DTDOApplicationReview() {
                     ? 'Share instructions or observations for the inspection team...'
                     : actionType === 'reject'
                       ? 'Please specify the reason for rejection...'
-                      : 'Please specify what corrections are needed...'
+                      : actionType === 'approve-bypass'
+                        ? 'Confirm approval without inspection...'
+                        : 'Please specify what corrections are needed...'
                 }
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
@@ -901,7 +913,7 @@ export default function DTDOApplicationReview() {
               data-testid="button-confirm-action"
             >
               {actionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Confirm {actionType === 'accept' ? 'Accept' : actionType === 'reject' ? 'Rejection' : 'Revert'}
+              Confirm {actionType === 'accept' ? 'Accept' : actionType === 'approve-bypass' ? 'Approval' : actionType === 'reject' ? 'Rejection' : 'Revert'}
             </Button>
           </DialogFooter>
         </DialogContent>
