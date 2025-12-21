@@ -19,7 +19,7 @@ import type { User, HomestayApplication } from "@shared/schema";
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  
+
   const { data: userData } = useQuery<{ user: User }>({
     queryKey: ["/api/auth/me"],
   });
@@ -45,27 +45,70 @@ export function AppSidebar() {
     queryKey: ["/api/da/inspections"],
     enabled: user?.role === "dealing_assistant",
   });
+
+  // Fetch Legacy RC applications for DA to show badge
+  const { data: daApplications } = useQuery<HomestayApplication[]>({
+    queryKey: ["/api/da/applications"],
+    enabled: user?.role === "dealing_assistant",
+    staleTime: 30 * 1000,
+  });
+
+  // Count Legacy RC applications that need attention
+  const legacyRCCounts = useMemo(() => {
+    if (user?.role !== "dealing_assistant" || !daApplications) {
+      return { newSubmissions: 0, total: 0 };
+    }
+    const legacyApps = daApplications.filter((app) =>
+      app.applicationNumber?.startsWith('LG-HS-')
+    );
+    const newSubmissions = legacyApps.filter((app) =>
+      ['legacy_rc_review', 'under_scrutiny', 'submitted'].includes(app.status ?? '')
+    ).length;
+    return { newSubmissions, total: legacyApps.length };
+  }, [daApplications, user?.role]);
+
   const pendingInspectionCount =
     user?.role === "dealing_assistant"
       ? (daInspections ?? []).filter((order) => !order.reportSubmitted).length
       : 0;
   const navigationSections = useMemo(() => {
-    if (user?.role !== "dealing_assistant" || pendingInspectionCount === 0) {
-      return navigation;
+    let sections = navigation;
+
+    // Add inspection badge for DA
+    if (user?.role === "dealing_assistant" && pendingInspectionCount > 0) {
+      sections = sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) => {
+          if (item.url === "/da/inspections") {
+            return {
+              ...item,
+              badge: pendingInspectionCount > 99 ? "99+" : String(pendingInspectionCount),
+            };
+          }
+          return item;
+        }),
+      }));
     }
-    return navigation.map((section) => ({
-      ...section,
-      items: section.items.map((item) => {
-        if (item.url === "/da/inspections") {
-          return {
-            ...item,
-            badge: pendingInspectionCount > 99 ? "99+" : String(pendingInspectionCount),
-          };
-        }
-        return item;
-      }),
-    }));
-  }, [navigation, pendingInspectionCount, user?.role]);
+
+    // Add Legacy RC count badge for DA
+    if (user?.role === "dealing_assistant" && legacyRCCounts.newSubmissions > 0) {
+      sections = sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) => {
+          if (item.url === "/da/legacy") {
+            return {
+              ...item,
+              badge: legacyRCCounts.newSubmissions > 99 ? "99+" : String(legacyRCCounts.newSubmissions),
+              badgeVariant: "success", // Green for new submissions
+            };
+          }
+          return item;
+        }),
+      }));
+    }
+
+    return sections;
+  }, [navigation, pendingInspectionCount, legacyRCCounts, user?.role]);
 
   const getUserInitials = (name: string) => {
     return name
@@ -175,7 +218,12 @@ export function AppSidebar() {
                         <item.icon className="w-4 h-4" />
                         <span>{item.title}</span>
                         {item.badge && (
-                          <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                          <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${item.badgeVariant === "success"
+                              ? "bg-emerald-500 text-white"
+                              : item.badgeVariant === "warning"
+                                ? "bg-amber-500 text-white"
+                                : "bg-primary text-primary-foreground"
+                            }`}>
                             {item.badge}
                           </span>
                         )}

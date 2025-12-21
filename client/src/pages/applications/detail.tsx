@@ -13,7 +13,7 @@ import { CheckCircle2, XCircle, MapPin, Phone, Mail, Bed, IndianRupee, FileText,
 import himachalTourismLogo from "@assets/WhatsApp Image 2025-10-25 at 07.59.16_5c0e8739_1761362811579.jpg";
 import hpGovtLogo from "@assets/WhatsApp Image 2025-10-25 at 08.03.16_1cdc4198_1761362811579.jpg";
 import type { HomestayApplication, User as UserType, Document } from "@shared/schema";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { ImageGallery } from "@/components/ImageGallery";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -287,13 +287,21 @@ export default function ApplicationDetail() {
   const shouldAutoOpenCorrections =
     isPropertyOwnerPreCheck && app && ownerCorrectionStatusesNeedingAction.includes(appStatus);
 
+  const hasRedirected = useRef(false);
+
   useEffect(() => {
+    if (hasRedirected.current) return;
+
     if (shouldAutoOpenCorrections && app?.id) {
+      hasRedirected.current = true;
       setLocation(`/applications/new?application=${app.id}`);
+      return;
     }
     // Redirect legacy_rc_draft to the editable form
     if (app?.status === 'legacy_rc_draft') {
+      hasRedirected.current = true;
       setLocation('/existing-owner');
+      return;
     }
   }, [app?.id, app?.status, setLocation, shouldAutoOpenCorrections]);
 

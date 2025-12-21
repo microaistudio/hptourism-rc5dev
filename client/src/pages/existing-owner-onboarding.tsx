@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, addYears, format } from "date-fns";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Handshake, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Handshake, AlertCircle, CheckCircle2, Loader2, Calendar } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const intakeSchema = z.object({
   guardianName: z.string().min(3, "Father's / care-of name is required"),
   rcNumber: z.string().min(3, "RC number is required"),
   rcIssueDate: z.string().min(4, "Issue date is required"),
+  certificateValidityYears: z.enum(["1", "3"]).default("1"),
   rcExpiryDate: z.string().min(4, "Expiry date is required"),
   notes: z.string().optional(),
 });
@@ -117,6 +119,7 @@ export default function ExistingOwnerOnboarding() {
       guardianName: "",
       rcNumber: "",
       rcIssueDate: "",
+      certificateValidityYears: "1",
       rcExpiryDate: "",
       notes: "",
     }),
@@ -129,6 +132,9 @@ export default function ExistingOwnerOnboarding() {
     mode: "onChange",
     reValidateMode: "onChange",
   });
+
+  const watchedIssueDate = form.watch("rcIssueDate");
+  const watchedValidityYears = form.watch("certificateValidityYears");
   const watchedDistrict = form.watch("district");
   const watchedTehsil = form.watch("tehsil");
   const baseTehsilOptions = watchedDistrict ? getTehsilsForDistrict(watchedDistrict) : [];
@@ -159,6 +165,19 @@ export default function ExistingOwnerOnboarding() {
     }
     return parsed.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
   }, [cutoffIsoDate]);
+
+  // Auto-calculate expiry date when issue date or validity years change
+  useEffect(() => {
+    if (watchedIssueDate && watchedValidityYears) {
+      const issueDate = new Date(watchedIssueDate);
+      if (!Number.isNaN(issueDate.getTime())) {
+        const years = parseInt(watchedValidityYears, 10);
+        const expiryDate = addYears(issueDate, years);
+        const formattedExpiry = format(expiryDate, "yyyy-MM-dd");
+        form.setValue("rcExpiryDate", formattedExpiry, { shouldValidate: true });
+      }
+    }
+  }, [watchedIssueDate, watchedValidityYears, form]);
 
   const [isHydrated, setIsHydrated] = useState(false);
   const loadedDraft = useRef(false);
@@ -645,7 +664,7 @@ export default function ExistingOwnerOnboarding() {
                   <div className="hidden md:block" />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   <FormField
                     control={form.control}
                     name="rcNumber"
@@ -677,6 +696,38 @@ export default function ExistingOwnerOnboarding() {
                   />
                   <FormField
                     control={form.control}
+                    name="certificateValidityYears"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          Validity Period
+                        </FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            className="flex gap-4"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="1" id="validity-1" />
+                              <label htmlFor="validity-1" className="text-sm cursor-pointer">1 Year</label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <RadioGroupItem value="3" id="validity-3" />
+                              <label htmlFor="validity-3" className="text-sm cursor-pointer">3 Years</label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Auto-calculates expiry from issue date
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="rcExpiryDate"
                     render={({ field }) => (
                       <FormItem>
@@ -684,6 +735,9 @@ export default function ExistingOwnerOnboarding() {
                         <FormControl>
                           <Input type="date" min={form.watch("rcIssueDate") || cutoffIsoDate} {...field} />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Editable if different from auto-calculated
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}

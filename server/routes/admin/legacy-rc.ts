@@ -260,5 +260,51 @@ export function createAdminLegacyRcRouter() {
     }
   });
 
+  // Quick status update for LG-HS applications (not old LEGACY- ones)
+  router.patch("/admin-rc/applications/:id/status", requireRole(...ADMIN_RC_ALLOWED_ROLES), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!status || typeof status !== "string") {
+        return res.status(400).json({ message: "Status is required" });
+      }
+
+      const validStatuses = [
+        "legacy_rc_review", "dtdo_review", "under_scrutiny", "forwarded_to_dtdo",
+        "approved", "rejected", "reverted_by_dtdo", "sent_back_for_corrections"
+      ];
+
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: `Invalid status. Valid: ${validStatuses.join(", ")}` });
+      }
+
+      const [existing] = await db
+        .select({ id: homestayApplications.id, applicationNumber: homestayApplications.applicationNumber })
+        .from(homestayApplications)
+        .where(eq(homestayApplications.id, id))
+        .limit(1);
+
+      if (!existing) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+
+      // Allow both LEGACY- and LG-HS- prefixes
+      if (!existing.applicationNumber?.startsWith("LG-HS-") && !existing.applicationNumber?.startsWith("LEGACY-")) {
+        return res.status(400).json({ message: "Not a legacy RC application" });
+      }
+
+      await db.update(homestayApplications)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(homestayApplications.id, id));
+
+      log.info(`[admin-rc] Status updated for ${existing.applicationNumber}: ${status}`);
+      res.json({ message: "Status updated", applicationNumber: existing.applicationNumber, status });
+    } catch (error) {
+      log.error("[admin-rc] Failed to update status:", error);
+      res.status(500).json({ message: "Failed to update status" });
+    }
+  });
+
   return router;
 }

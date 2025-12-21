@@ -372,7 +372,20 @@ export default function DADashboard() {
     () =>
       sortApplications(
         allApplications.filter(
-          (app) => app.status === "approved" && completedRangeFilter(app.approvedAt ?? app.updatedAt),
+          (app) => app.status === "approved" &&
+            !app.applicationNumber?.startsWith('LG-HS-') &&  // Exclude Legacy RC
+            completedRangeFilter(app.approvedAt ?? app.updatedAt),
+        ),
+      ),
+    [allApplications, sortApplications, completedRangeFilter],
+  );
+  const legacyRCVerified = useMemo(
+    () =>
+      sortApplications(
+        allApplications.filter(
+          (app) => app.status === "approved" &&
+            app.applicationNumber?.startsWith('LG-HS-') &&
+            completedRangeFilter(app.approvedAt ?? app.updatedAt),
         ),
       ),
     [allApplications, sortApplications, completedRangeFilter],
@@ -390,8 +403,7 @@ export default function DADashboard() {
       process: `Screening ${sortedUnderScrutiny.length} · Forwarded ${sortedForwarded.length}`,
       corrections: `Sent back ${sortedAwaitingOwners.length} · Resubmitted ${sortedResubmitted.length}`,
       inspections: `Scheduled ${scheduledInspections.length} · Reports ${completedInspectionsThisMonth.length}`,
-      completed: `Approved ${approvedCompleted.length} · Rejected ${rejectedCompleted.length} · ${completedRange === "month" ? "This month" : "Last 30d"
-        }`,
+      completed: `Approved ${approvedCompleted.length} · RC Verified ${legacyRCVerified.length} · Rejected ${rejectedCompleted.length}`,
     }),
     [
       submittedNew.length,
@@ -555,6 +567,15 @@ export default function DADashboard() {
             emptyDescription: "Complete scrutiny + inspection to unlock approvals.",
           },
           {
+            value: "completed-legacy-rc",
+            label: "Existing RC Verified",
+            count: legacyRCVerified.length,
+            description: "Existing RC registrations verified and onboarded.",
+            applications: legacyRCVerified,
+            emptyTitle: "No RC verifications yet",
+            emptyDescription: "Verified Existing RC registrations will appear here.",
+          },
+          {
             value: "completed-rejected",
             label: "Rejected",
             count: rejectedCompleted.length,
@@ -579,6 +600,7 @@ export default function DADashboard() {
       completedInspectionsThisMonth,
       navigateToInspections,
       approvedCompleted,
+      legacyRCVerified,
       rejectedCompleted,
       completedRange,
       stageSummaries,
@@ -620,7 +642,7 @@ export default function DADashboard() {
       process: sortedUnderScrutiny.length + sortedForwarded.length,
       corrections: sortedAwaitingOwners.length + sortedResubmitted.length,
       inspections: scheduledInspections.length + completedInspectionsThisMonth.length,
-      completed: approvedCompleted.length + rejectedCompleted.length,
+      completed: approvedCompleted.length + legacyRCVerified.length + rejectedCompleted.length,
     };
     const currentTotal = stageTotals[activeStage] ?? 0;
     if (currentTotal > 0) return;
@@ -647,6 +669,7 @@ export default function DADashboard() {
     scheduledInspections.length,
     completedInspectionsThisMonth.length,
     approvedCompleted.length,
+    legacyRCVerified.length,
     rejectedCompleted.length,
   ]);
   const activeStageConfig =

@@ -30,6 +30,7 @@ export interface NavItem {
   url: string;
   icon: LucideIcon;
   badge?: string;
+  badgeVariant?: "default" | "success" | "warning";
 }
 
 export interface NavSection {

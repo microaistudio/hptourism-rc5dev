@@ -1,0 +1,156 @@
+Test_ID,Module,Test_Suite,Test_Case,Steps,Expected_Result,Status,Tester,Date,Notes
+A1-01,New Registration,Submission,Login as Property Owner,"1. Open portal URL
+2. Enter Owner credentials
+3. Click Login",User is logged in and redirected to dashboard,,,,,
+A1-02,New Registration,Submission,Navigate to New Application,"1. Click 'New Application' in sidebar","New application form opens with Step 1 visible",,,,,
+A1-03,New Registration,Submission,Complete Step 1 - Property Details,"1. Fill Property Name
+2. Select District/Tehsil
+3. Enter Address
+4. Enter Pincode","Form validates and allows navigation to Step 2",,,,,
+A1-04,New Registration,Submission,Complete Step 2 - Owner Details,"1. Enter Owner Name
+2. Enter Mobile Number
+3. Enter Email (optional)
+4. Fill Aadhaar details","Form validates and allows navigation to Step 3",,,,,
+A1-05,New Registration,Submission,Complete Step 3 - Rooms & Category,"1. Select Room Types
+2. Enter Room Counts
+3. Enter Tariffs
+4. Verify Category auto-calculated","Category shows (Silver/Gold/Diamond) based on rooms",,,,,
+A1-06,New Registration,Submission,Complete Step 4 - Distances,"1. Enter distance to Hospital
+2. Enter distance to Fire Station
+3. Enter distance to Police Station","All mandatory distances entered",,,,,
+A1-07,New Registration,Submission,Complete Step 5 - Documents,"1. Upload Property Photo
+2. Upload Owner ID Proof
+3. Upload Ownership Documents
+4. Verify all required docs uploaded","Documents uploaded and shown in list",,,,,
+A1-08,New Registration,Submission,Complete Step 6 - Review & Submit,"1. Review all entered information
+2. Accept Terms & Conditions
+3. Click Submit","Application submitted successfully with confirmation",,,,,
+A1-09,New Registration,Submission,Verify Dashboard Status,"1. Navigate to Dashboard
+2. Find submitted application","Application shows status 'Submitted' or 'Under Scrutiny'",,,,,
+A2-01,New Registration,DA Processing,Login as DA,"1. Open portal
+2. Enter DA credentials
+3. Login","DA Dashboard visible",,,,,
+A2-02,New Registration,DA Processing,View New Applications,"1. Check 'New Applications' card
+2. Verify count matches","New application visible in list",,,,,
+A2-03,New Registration,DA Processing,Open and Review Application,"1. Click on application
+2. Review Property tab
+3. Review Owner tab
+4. Review Documents tab","All information displayed correctly",,,,,
+A2-04,New Registration,DA Processing,Accept and Forward,"1. Click 'Accept & Schedule Inspection'
+2. Enter remarks if prompted
+3. Confirm action","Application forwarded to DTDO",,,,,
+A3-01,New Registration,DTDO Approval,Login as DTDO,"1. Open portal
+2. Enter DTDO credentials
+3. Login","DTDO Dashboard visible",,,,,
+A3-02,New Registration,DTDO Approval,Schedule Site Inspection,"1. Open forwarded application
+2. Click 'Accept & Schedule Inspection'
+3. Set inspection date","Inspection scheduled",,,,,
+A3-03,New Registration,DTDO Approval,Complete Inspection Report,"1. Fill inspection findings
+2. Upload photos (if any)
+3. Submit report","Inspection report saved",,,,,
+A3-04,New Registration,DTDO Approval,Approve After Inspection,"1. Review inspection report
+2. Click 'Approve'
+3. Confirm","Status changes to 'payment_pending'",,,,,
+B1-01,Existing RC,Initial Submission,Access Existing RC Registration,"1. Login as Property Owner
+2. Click 'Existing RC Registration' in sidebar","Existing RC form opens",,,,,
+B1-02,Existing RC,Initial Submission,Fill Property Details from RC,"1. Enter existing RC number
+2. Fill property name
+3. Enter address and district","Form populated with RC details",,,,,
+B1-03,Existing RC,Initial Submission,Upload Supporting Documents,"1. Upload existing RC copy
+2. Upload property photos
+3. Upload any other required docs","Documents uploaded successfully",,,,,
+B1-04,Existing RC,Initial Submission,Submit Application,"1. Review entered information
+2. Submit application","Application submitted - Number starts with 'LG-HS-'",,,,,
+B2-01,Existing RC,Direct Approval,DTDO Opens Legacy RC App,"1. Login as DTDO
+2. Navigate to Existing RC Queue
+3. Open Legacy RC application","Application details visible",,,,,
+B2-02,Existing RC,Direct Approval,Verify Checkbox Unchecked,"1. Look at Decision panel
+2. Check 'Conduct inspection first' checkbox","Checkbox visible and UNCHECKED by default",,,,,
+B2-03,Existing RC,Direct Approval,Verify Green Approve Button,"1. Check button label
+2. Check button color","Green 'Approve RC Verification' button visible",,,,,
+B2-04,Existing RC,Direct Approval,Approve Without Inspection,"1. Leave checkbox unchecked
+2. Click 'Approve RC Verification'
+3. Enter remarks
+4. Confirm","Application goes directly to 'approved' status",,,,,
+B2-05,Existing RC,Direct Approval,Verify Skips Payment,"1. Check application status
+2. Verify NOT 'payment_pending'","Status shows 'approved' - NOT 'verified_for_payment'",,,,,
+B3-01,Existing RC,Optional Inspection,Check Inspection Checkbox,"1. Open another Legacy RC app
+2. Check 'Conduct inspection first'","Button changes to 'Schedule Inspection'",,,,,
+B3-02,Existing RC,Optional Inspection,Schedule Inspection for Legacy RC,"1. Click 'Schedule Inspection'
+2. Set date
+3. Confirm","Inspection scheduled for Legacy RC",,,,,
+B3-03,Existing RC,Optional Inspection,Complete and Approve,"1. Submit inspection report
+2. Approve inspection","Status goes to 'approved' (skips payment)",,,,,
+B4-01,Existing RC,Correction Flow,DTDO Reverts Application,"1. Open Legacy RC app
+2. Click 'Revert to Applicant'
+3. Enter remarks
+4. Confirm","Status changes to correction required",,,,,
+B4-02,Existing RC,Correction Flow,Owner Sees Correction Banner,"1. Login as Owner
+2. Open application detail","'Corrections required' banner visible with remarks",,,,,
+B4-03,Existing RC,Correction Flow,Navigate to Documents Step,"1. Click 'Continue Corrections'
+2. OR click 'Existing RC Registration'","Form opens directly at Documents step",,,,,
+B4-04,Existing RC,Correction Flow,Verify Limited View,"1. Check visible sections
+2. Look for unnecessary steps","Only 'Additional/Supporting Documents' section visible",,,,,
+B4-05,Existing RC,Correction Flow,Upload New Document,"1. Click upload in documents section
+2. Select file
+3. Upload","New document uploaded successfully",,,,,
+B4-06,Existing RC,Correction Flow,Resubmit for Verification,"1. Find 'Resubmit for Verification' button
+2. Click to resubmit","Application resubmitted - status: 'dtdo_review'",,,,,
+B4-07,Existing RC,Correction Flow,DTDO Receives Resubmission,"1. Login as DTDO
+2. Check Legacy RC queue","Resubmitted app visible in queue",,,,,
+B4-08,Existing RC,Correction Flow,Approve After Correction,"1. Open resubmitted app
+2. Approve","Application approved successfully",,,,,
+B5-01,Existing RC,DA Badge,Check Menu Badge,"1. Login as DA
+2. Look at sidebar menu","Green badge with count on 'Existing RC Registration'",,,,,
+B5-02,Existing RC,DA Badge,Verify Badge Count,"1. Count apps in Legacy RC queue
+2. Compare with badge","Badge count matches pending applications",,,,,
+B6-01,Existing RC,Verified Category,Navigate to Completed,"1. Login as DA
+2. Go to Dashboard
+3. Click COMPLETED section","Completed section opens",,,,,
+B6-02,Existing RC,Verified Category,Verify Three Categories,"1. Check available pills/tabs","Three pills: 'Approved' | 'Existing RC Verified' | 'Rejected'",,,,,
+B6-03,Existing RC,Verified Category,Click Existing RC Verified,"1. Click 'Existing RC Verified' pill
+2. Check displayed apps","Only LG-HS- applications shown",,,,,
+C1-01,Amendments,Add Rooms,Access Add Rooms Service,"1. Login as approved Owner
+2. Navigate to Services
+3. Select 'Add Rooms'","Add Rooms form opens",,,,,
+C1-02,Amendments,Add Rooms,Submit Add Rooms Request,"1. Enter new room details
+2. Submit request","Request submitted for processing",,,,,
+C1-03,Amendments,Add Rooms,DA/DTDO Approval,"1. Process through DA
+2. DTDO approves","Room count updated on certificate",,,,,
+C2-01,Amendments,Delete Rooms,Access Delete Rooms Service,"1. Select 'Delete Rooms' service
+2. Specify rooms to delete","Delete request form opens",,,,,
+C2-02,Amendments,Delete Rooms,Verify Inspection Optional,"1. Check DTDO decision panel
+2. Look for bypass option","Inspection bypass available for delete rooms",,,,,
+C2-03,Amendments,Delete Rooms,Approve Deletion,"1. Complete approval workflow","Room count decreased on certificate",,,,,
+C3-01,Amendments,Category Upgrade,Submit Category Upgrade,"1. Select category upgrade service
+2. Submit with justification","Upgrade request submitted",,,,,
+C3-02,Amendments,Category Upgrade,Complete Approval,"1. DA and DTDO process
+2. Approve upgrade","Category changed (e.g. Silver → Gold)",,,,,
+C4-01,Amendments,Cancel Certificate,Submit Cancellation,"1. Select 'Cancel Certificate' service
+2. Provide reason
+3. Submit","Cancellation request submitted",,,,,
+C4-02,Amendments,Cancel Certificate,DTDO Sees Cancel Button,"1. Login as DTDO
+2. Open cancellation request","'Approve Cancellation (Revoke Certificate)' button visible",,,,,
+C4-03,Amendments,Cancel Certificate,Approve Cancellation,"1. Click approve button
+2. Confirm","RC marked as cancelled",,,,,
+D1-01,UI/UX,Toast Position,Trigger Toast Notification,"1. Perform any action that shows toast
+2. Observe position","Toast appears in bottom-left corner",,,,,
+D1-02,UI/UX,Toast Size,Check Toast Dimensions,"1. When toast appears
+2. Check size","Toast is compact/smaller size",,,,,
+D1-03,UI/UX,Toast Animation,Check Toast Animation,"1. Watch toast appear","Toast slides in from left side",,,,,
+D1-04,UI/UX,Toast Duration,Time Toast Duration,"1. Start timer when toast appears
+2. Stop when disappears","Toast disappears in ~2 seconds",,,,,
+D2-01,UI/UX,Redirect Fix,Test Correction Redirect,"1. Open app needing correction
+2. Observe navigation","Redirects to editor - no infinite loop",,,,,
+D2-02,UI/UX,Redirect Fix,Verify Single Redirect,"1. Check browser history
+2. Count redirects","Only one redirect occurs",,,,,
+D3-01,UI/UX,Banner Fix,View Resubmitted App,"1. Open app that HAS been resubmitted
+2. Check for banner","'Corrections required' banner does NOT show",,,,,
+D3-02,UI/UX,Banner Fix,View App Needing Correction,"1. Open app that NEEDS correction
+2. Check for banner","'Corrections required' banner shows correctly",,,,,
+E1-01,Edge Cases,Invalid Access,Access Non-Correction App,"1. Copy URL of app in 'dtdo_review'
+2. Try ?application=<id> route","Shows error: 'Cannot edit this application'",,,,,
+E1-02,Edge Cases,Invalid Access,Verify Redirect,"1. After error
+2. Check navigation","Redirects to application detail page",,,,,
+E2-01,Edge Cases,District Restriction,Cross-District Access,"1. Login as DA from District A
+2. Try to access app from District B","Access denied message shown",,,,,

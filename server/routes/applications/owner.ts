@@ -1157,7 +1157,8 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
         application.status !== "sent_back_for_corrections" &&
         application.status !== "reverted_to_applicant" &&
         application.status !== "reverted_by_dtdo" &&
-        application.status !== "objection_raised"
+        application.status !== "objection_raised" &&
+        application.status !== "legacy_rc_reverted" // Allow Legacy RC corrections
       ) {
         return res.status(400).json({
           message: "Application can only be updated when sent back for corrections",
@@ -1166,6 +1167,55 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
 
       const validatedData = correctionUpdateSchema.parse(req.body);
       const normalizedUpdate: Record<string, unknown> = { ...validatedData };
+
+      // SPECIAL CASE: Legacy RC corrections only update documents, skip all other validations
+      const isLegacyRC = application.applicationNumber?.startsWith('LG-HS-');
+      if (isLegacyRC) {
+        const normalizedDocuments = normalizeDocumentsForPersistence(validatedData.documents);
+        const nextCorrectionCount = (application.correctionSubmissionCount ?? 0) + 1;
+
+        // Use same routing as normal corrections - go back to DTDO if that's the target
+        const targetStatus =
+          CORRECTION_RESUBMIT_TARGET === "dtdo" ? "dtdo_review" : "legacy_rc_review";
+
+        const updatedApplication = await storage.updateApplication(id, {
+          documents: normalizedDocuments as any,
+          status: targetStatus,
+          submittedAt: new Date(),
+          clarificationRequested: null,
+          dtdoRemarks: null,
+          districtNotes: null,
+          correctionSubmissionCount: nextCorrectionCount,
+        } as Partial<HomestayApplication>);
+
+        await logApplicationAction({
+          applicationId: id,
+          actorId: userId,
+          action: "correction_resubmitted",
+          previousStatus: application.status,
+          newStatus: targetStatus,
+          feedback: `Legacy RC correction resubmitted (cycle ${nextCorrectionCount})`,
+        });
+
+        // Update documents in separate table if needed
+        if (normalizedDocuments) {
+          await storage.deleteDocumentsByApplication(id);
+          for (const doc of normalizedDocuments) {
+            const createdDoc = await storage.createDocument({
+              applicationId: id,
+              documentType: doc.documentType,
+              fileName: doc.fileName,
+              filePath: doc.filePath,
+              fileSize: doc.fileSize,
+              mimeType: doc.mimeType,
+            });
+            await linkDocumentToStorage(createdDoc);
+          }
+        }
+
+        return res.json({ message: "Legacy RC resubmitted for verification", application: updatedApplication });
+      }
+
 
       if (normalizedUpdate.pincode !== undefined) {
         normalizedUpdate.pincode = normalizeStringField(
@@ -1381,7 +1431,9 @@ export function createOwnerApplicationsRouter({ getRoomRateBandsSetting }: Owner
       normalizedUpdate.totalRooms = totalRooms;
 
       const nextCorrectionCount = (application.correctionSubmissionCount ?? 0) + 1;
+
       // Decide which queue to send the resubmission to
+      // Note: Legacy RC already returned early, so this is for regular corrections only
       const targetStatus =
         CORRECTION_RESUBMIT_TARGET === "dtdo" ? "dtdo_review" : "under_scrutiny";
 

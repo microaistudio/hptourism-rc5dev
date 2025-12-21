@@ -731,6 +731,42 @@ export function createDtdoRouter() {
                 });
             }
 
+            // Legacy RC: skip payment entirely - they already have valid RCs
+            const isLegacyRC = application.applicationNumber?.startsWith('LG-HS-');
+            if (isLegacyRC) {
+                const approvedApplication = await storage.updateApplication(applicationId, {
+                    status: 'approved',
+                    approvedAt: new Date(),
+                    dtdoId: userId,
+                    districtNotes: remarks || 'Existing RC verified. Certificate issued based on existing RC details.',
+                    districtOfficerId: userId,
+                    districtReviewDate: new Date(),
+                });
+
+                await logApplicationAction({
+                    applicationId,
+                    actorId: userId,
+                    action: "approved",
+                    previousStatus: application.status,
+                    newStatus: "approved",
+                    feedback: `Existing RC verified. No payment required.`,
+                });
+
+                const rcOwner = await storage.getUser(application.userId);
+                queueNotification("application_approved", {
+                    application: approvedApplication ?? {
+                        ...application,
+                        status: 'approved',
+                    },
+                    owner: rcOwner ?? null,
+                });
+
+                return res.json({
+                    message: "Existing RC verification approved. Certificate issued.",
+                    isLegacyRC: true,
+                });
+            }
+
             // Standard flow - set to verified_for_payment
             const verifiedApplication = await storage.updateApplication(applicationId, {
                 status: 'verified_for_payment',
@@ -972,12 +1008,14 @@ export function createDtdoRouter() {
                 return res.status(403).json({ message: "You can only process applications from your district" });
             }
 
-            // Verify global setting allows this bypass
+            // Verify global setting allows this bypass (Legacy RC is always allowed)
+            const isLegacyRC = application.applicationNumber?.startsWith('LG-HS-');
             const { getSystemSettingRecord } = await import("../services/systemSettings");
             const inspectionSetting = await getSystemSettingRecord("inspection_config");
             const optionalKinds = (inspectionSetting?.settingValue as { optionalKinds: string[] })?.optionalKinds || [];
 
-            if (!optionalKinds.includes(application.applicationKind)) {
+            // Legacy RC: Always allow bypass - they already have valid RCs
+            if (!isLegacyRC && !optionalKinds.includes(application.applicationKind)) {
                 return res.status(400).json({
                     message: `Inspection bypass is not enabled for '${application.applicationKind}'. Please schedule an inspection.`
                 });

@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -92,6 +93,9 @@ export default function DTDOApplicationReview() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedFields, setEditedFields] = useState<Partial<HomestayApplication>>({});
 
+  // Legacy RC: optional inspection (default: no inspection)
+  const [requireInspection, setRequireInspection] = useState(false);
+
   const { data, isLoading } = useQuery<ApplicationData>({
     queryKey: ["/api/dtdo/applications", id],
   });
@@ -163,6 +167,9 @@ export default function DTDOApplicationReview() {
   const correctionHistory = data?.correctionHistory ?? [];
   const correctionCount = application?.correctionSubmissionCount ?? 0;
   const lastCorrection = correctionHistory[0];
+
+  // Detect Legacy RC applications (Existing RC onboarding)
+  const isLegacyRC = application?.applicationNumber?.startsWith('LG-HS-') ?? false;
 
   const documentStats = useMemo(() => {
     const counts = { pending: 0, verified: 0, needsCorrection: 0, rejected: 0 };
@@ -696,6 +703,46 @@ export default function DTDOApplicationReview() {
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Approve Cancellation (Revoke Certificate)
                   </Button>
+                ) : isLegacyRC ? (
+                  /* Legacy RC: Direct approval with optional inspection */
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg">
+                      <Checkbox
+                        id="require-inspection"
+                        checked={requireInspection}
+                        onCheckedChange={(checked) => setRequireInspection(checked === true)}
+                      />
+                      <label
+                        htmlFor="require-inspection"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Conduct inspection first
+                      </label>
+                    </div>
+
+                    {requireInspection ? (
+                      <Button
+                        className="w-full"
+                        variant="default"
+                        onClick={() => handleAction('accept')}
+                        disabled={actionMutation.isPending}
+                        data-testid="button-accept-legacy-inspection"
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Schedule Inspection
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        onClick={() => handleAction('approve-bypass')}
+                        disabled={actionMutation.isPending}
+                        data-testid="button-approve-legacy-rc"
+                      >
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Approve RC Verification
+                      </Button>
+                    )}
+                  </div>
                 ) : (
                   <Button
                     className="w-full"
@@ -709,8 +756,8 @@ export default function DTDOApplicationReview() {
                   </Button>
                 )}
 
-                {/* Optional Inspection Bypass */}
-                {settings?.inspectionConfig?.optionalKinds?.includes(application?.applicationKind || '') && (
+                {/* Optional Inspection Bypass - only for non-Legacy RC apps */}
+                {!isLegacyRC && settings?.inspectionConfig?.optionalKinds?.includes(application?.applicationKind || '') && (
                   <Button
                     className="w-full"
                     variant="secondary"

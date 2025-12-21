@@ -492,9 +492,13 @@ export function createApplicationsRouter() {
         let newStatus;
         let clarificationRequested = null;
 
+        // Legacy RC applications skip payment - they already have valid RCs
+        const isLegacyRC = application.applicationNumber?.startsWith('LG-HS-');
+
         switch (outcome) {
           case "approved":
-            newStatus = "payment_pending";
+            // Legacy RC: skip payment, go directly to approved
+            newStatus = isLegacyRC ? "approved" : "payment_pending";
             break;
           case "corrections_needed":
             newStatus = "sent_back_for_corrections";
@@ -519,6 +523,9 @@ export function createApplicationsRouter() {
           updateData.rejectionReason = findings?.issuesFound || notes || "Application rejected after site inspection";
         } else if (outcome === "corrections_needed") {
           updateData.clarificationRequested = clarificationRequested;
+        } else if (outcome === "approved" && isLegacyRC) {
+          // Legacy RC: set approval date directly since no payment step
+          updateData.approvedAt = new Date();
         }
 
         const updated = await storage.updateApplication(id, updateData);
